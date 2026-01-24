@@ -1,15 +1,12 @@
 import { useState } from "react";
 import { 
-  Settings, 
-  Users, 
-  Clock, 
-  Target, 
-  MessageSquare, 
-  Heart, 
-  UserPlus, 
   Zap,
   ChevronRight,
-  LayoutDashboard
+  LayoutDashboard,
+  Flame,
+  UserPlus,
+  Users,
+  Settings
 } from "lucide-react";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +19,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface NavItemProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -76,15 +80,94 @@ function ConfigSection({ icon: Icon, title, children, defaultOpen = false }: Con
   );
 }
 
+// Warmup configurations by day
+const warmupConfigs = {
+  1: {
+    label: "Day 1 - The Ghost",
+    feed: { enabled: true, minScrolls: 13, maxScrolls: 20 },
+    reels: { enabled: true, minMinutes: 3, maxMinutes: 6 },
+    limits: { maxLikes: 3, maxFollows: 2 },
+    speed: "slow",
+    chance: { follow: 30, like: 20, comment: 20 }
+  },
+  2: {
+    label: "Day 2 - The Observer",
+    feed: { enabled: true, minScrolls: 18, maxScrolls: 25 },
+    reels: { enabled: true, minMinutes: 5, maxMinutes: 8 },
+    limits: { maxLikes: 5, maxFollows: 3 },
+    speed: "slow",
+    chance: { follow: 20, like: 30, comment: 20 }
+  },
+  3: {
+    label: "Day 3 - Waking Up",
+    feed: { enabled: true, minScrolls: 25, maxScrolls: 30 },
+    reels: { enabled: true, minMinutes: 5, maxMinutes: 10 },
+    limits: { maxLikes: 10, maxFollows: 5 },
+    speed: "normal",
+    chance: { follow: 20, like: 30, comment: 30 }
+  },
+  4: {
+    label: "Day 4 - Casual User",
+    feed: { enabled: true, minScrolls: 45, maxScrolls: 50 },
+    reels: { enabled: true, minMinutes: 10, maxMinutes: 15 },
+    limits: { maxLikes: 15, maxFollows: 8 },
+    speed: "normal",
+    chance: { follow: 20, like: 30, comment: 30 }
+  },
+  5: {
+    label: "Day 5 - Active User",
+    feed: { enabled: true, minScrolls: 45, maxScrolls: 55 },
+    reels: { enabled: true, minMinutes: 15, maxMinutes: 20 },
+    limits: { maxLikes: 30, maxFollows: 8 },
+    speed: "normal",
+    chance: { follow: 20, like: 25, comment: 30 }
+  },
+  6: {
+    label: "Day 6 - The Addict",
+    feed: { enabled: true, minScrolls: 50, maxScrolls: 60 },
+    reels: { enabled: true, minMinutes: 15, maxMinutes: 26 },
+    limits: { maxLikes: 30, maxFollows: 10 },
+    speed: "fast",
+    chance: { follow: 20, like: 35, comment: 30 }
+  },
+  7: {
+    label: "Day 7 - Full Power",
+    feed: { enabled: true, minScrolls: 55, maxScrolls: 65 },
+    reels: { enabled: true, minMinutes: 15, maxMinutes: 25 },
+    limits: { maxLikes: 30, maxFollows: 12 },
+    speed: "fast",
+    chance: { follow: 40, like: 40, comment: 35 }
+  }
+};
+
+type DayKey = keyof typeof warmupConfigs;
+
 export function AutomationSidebar() {
   const [activeNav, setActiveNav] = useState("dashboard");
-  const [followDelay, setFollowDelay] = useState([5]);
-  const [likeDelay, setLikeDelay] = useState([3]);
-  const [dailyLimit, setDailyLimit] = useState(200);
-  const [autoFollow, setAutoFollow] = useState(true);
-  const [autoLike, setAutoLike] = useState(true);
-  const [autoComment, setAutoComment] = useState(false);
-  const [autoDM, setAutoDM] = useState(false);
+  const [selectedDay, setSelectedDay] = useState<DayKey>(1);
+  
+  // Follow config state
+  const [followConfig, setFollowConfig] = useState({
+    batchSize: 100,
+    sessionLimit2h: 5,
+    minBatchStart: 1,
+    cooldownHours: 2.0,
+    patternBreak: 4,
+    minDelay: 20,
+    maxDelay: 45,
+    doVetting: true
+  });
+
+  const currentWarmup = warmupConfigs[selectedDay];
+
+  const getSpeedColor = (speed: string) => {
+    switch (speed) {
+      case "slow": return "text-green-400";
+      case "normal": return "text-yellow-400";
+      case "fast": return "text-red-400";
+      default: return "text-muted-foreground";
+    }
+  };
 
   return (
     <aside className="w-72 h-screen bg-card border-r border-border flex flex-col">
@@ -116,12 +199,6 @@ export function AutomationSidebar() {
           onClick={() => setActiveNav("devices")}
         />
         <NavItem
-          icon={Target}
-          label="Targeting"
-          isActive={activeNav === "targeting"}
-          onClick={() => setActiveNav("targeting")}
-        />
-        <NavItem
           icon={Settings}
           label="Settings"
           isActive={activeNav === "settings"}
@@ -137,90 +214,198 @@ export function AutomationSidebar() {
           Automation Config
         </p>
 
-        <ConfigSection icon={UserPlus} title="Follow Settings" defaultOpen>
+        {/* Warmup Section */}
+        <ConfigSection icon={Flame} title="Warmup" defaultOpen>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto-follow" className="text-sm">Auto Follow</Label>
-              <Switch
-                id="auto-follow"
-                checked={autoFollow}
-                onCheckedChange={setAutoFollow}
-              />
-            </div>
+            {/* Day Selector */}
             <div className="space-y-2">
-              <div className="flex justify-between">
-                <Label className="text-sm">Delay (seconds)</Label>
-                <span className="text-sm text-primary font-medium">{followDelay[0]}s</span>
+              <Label className="text-sm">Select Day</Label>
+              <Select
+                value={String(selectedDay)}
+                onValueChange={(val) => setSelectedDay(Number(val) as DayKey)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(warmupConfigs).map(([day, config]) => (
+                    <SelectItem key={day} value={day}>
+                      {config.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Current Day Config Display */}
+            <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
+              {/* Speed */}
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Speed</span>
+                <span className={cn("text-xs font-medium uppercase", getSpeedColor(currentWarmup.speed))}>
+                  {currentWarmup.speed}
+                </span>
               </div>
-              <Slider
-                value={followDelay}
-                onValueChange={setFollowDelay}
-                max={30}
-                min={1}
-                step={1}
-                className="w-full"
-              />
+
+              {/* Feed */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Feed Scrolls</span>
+                  <div className="flex items-center gap-1">
+                    <Switch checked={currentWarmup.feed.enabled} disabled className="scale-75" />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Min</p>
+                    <p className="text-sm font-medium text-foreground">{currentWarmup.feed.minScrolls}</p>
+                  </div>
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Max</p>
+                    <p className="text-sm font-medium text-foreground">{currentWarmup.feed.maxScrolls}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Reels */}
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-muted-foreground">Reels (minutes)</span>
+                  <Switch checked={currentWarmup.reels.enabled} disabled className="scale-75" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Min</p>
+                    <p className="text-sm font-medium text-foreground">{currentWarmup.reels.minMinutes}</p>
+                  </div>
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Max</p>
+                    <p className="text-sm font-medium text-foreground">{currentWarmup.reels.maxMinutes}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Limits */}
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground">Limits</span>
+                <div className="flex gap-2">
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Likes</p>
+                    <p className="text-sm font-medium text-foreground">{currentWarmup.limits.maxLikes}</p>
+                  </div>
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Follows</p>
+                    <p className="text-sm font-medium text-foreground">{currentWarmup.limits.maxFollows}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chances */}
+              <div className="space-y-1">
+                <span className="text-xs text-muted-foreground">Chances (%)</span>
+                <div className="flex gap-2">
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Follow</p>
+                    <p className="text-sm font-medium text-primary">{currentWarmup.chance.follow}%</p>
+                  </div>
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Like</p>
+                    <p className="text-sm font-medium text-primary">{currentWarmup.chance.like}%</p>
+                  </div>
+                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
+                    <p className="text-xs text-muted-foreground">Comment</p>
+                    <p className="text-sm font-medium text-primary">{currentWarmup.chance.comment}%</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-sm">Daily Limit</Label>
+          </div>
+        </ConfigSection>
+
+        {/* Follow Automation Section */}
+        <ConfigSection icon={UserPlus} title="Follow Automation">
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Batch Size</Label>
+                <Input
+                  type="number"
+                  value={followConfig.batchSize}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, batchSize: Number(e.target.value) }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Session Limit (2h)</Label>
+                <Input
+                  type="number"
+                  value={followConfig.sessionLimit2h}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, sessionLimit2h: Number(e.target.value) }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Min Batch Start</Label>
+                <Input
+                  type="number"
+                  value={followConfig.minBatchStart}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, minBatchStart: Number(e.target.value) }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cooldown (hours)</Label>
+                <Input
+                  type="number"
+                  step="0.5"
+                  value={followConfig.cooldownHours}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, cooldownHours: Number(e.target.value) }))}
+                  className="h-8 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Pattern Break</Label>
               <Input
                 type="number"
-                value={dailyLimit}
-                onChange={(e) => setDailyLimit(Number(e.target.value))}
-                className="h-9"
+                value={followConfig.patternBreak}
+                onChange={(e) => setFollowConfig(prev => ({ ...prev, patternBreak: Number(e.target.value) }))}
+                className="h-8 text-sm"
               />
             </div>
-          </div>
-        </ConfigSection>
 
-        <ConfigSection icon={Heart} title="Like Settings">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto-like" className="text-sm">Auto Like</Label>
-              <Switch
-                id="auto-like"
-                checked={autoLike}
-                onCheckedChange={setAutoLike}
-              />
-            </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <Label className="text-sm">Delay (seconds)</Label>
-                <span className="text-sm text-primary font-medium">{likeDelay[0]}s</span>
+                <Label className="text-xs">Delay Range (seconds)</Label>
+                <span className="text-xs text-primary font-medium">{followConfig.minDelay}s - {followConfig.maxDelay}s</span>
               </div>
-              <Slider
-                value={likeDelay}
-                onValueChange={setLikeDelay}
-                max={20}
-                min={1}
-                step={1}
-                className="w-full"
-              />
+              <div className="flex gap-2 items-center">
+                <Input
+                  type="number"
+                  value={followConfig.minDelay}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, minDelay: Number(e.target.value) }))}
+                  className="h-8 text-sm w-20"
+                />
+                <span className="text-muted-foreground">to</span>
+                <Input
+                  type="number"
+                  value={followConfig.maxDelay}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, maxDelay: Number(e.target.value) }))}
+                  className="h-8 text-sm w-20"
+                />
+              </div>
             </div>
-          </div>
-        </ConfigSection>
 
-        <ConfigSection icon={MessageSquare} title="Comment Settings">
-          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label htmlFor="auto-comment" className="text-sm">Auto Comment</Label>
+              <Label htmlFor="do-vetting" className="text-sm">Enable Vetting</Label>
               <Switch
-                id="auto-comment"
-                checked={autoComment}
-                onCheckedChange={setAutoComment}
-              />
-            </div>
-          </div>
-        </ConfigSection>
-
-        <ConfigSection icon={Clock} title="DM Settings">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="auto-dm" className="text-sm">Auto DM</Label>
-              <Switch
-                id="auto-dm"
-                checked={autoDM}
-                onCheckedChange={setAutoDM}
+                id="do-vetting"
+                checked={followConfig.doVetting}
+                onCheckedChange={(checked) => setFollowConfig(prev => ({ ...prev, doVetting: checked }))}
               />
             </div>
           </div>

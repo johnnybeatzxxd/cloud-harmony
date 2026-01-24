@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { AutomationSidebar } from "@/components/AutomationSidebar";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { StatsCards } from "@/components/StatsCards";
@@ -18,7 +20,7 @@ const Index = () => {
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      <AutomationSidebar 
+      <AutomationSidebar
         onStartAutomation={handleStartAutomation}
         selectedDeviceCount={selectedDeviceIds.length}
       />
@@ -27,7 +29,17 @@ const Index = () => {
         <main className="flex-1 p-8 space-y-6 overflow-auto">
           <StatsCards />
           <div>
-            <h2 className="text-lg font-semibold text-foreground mb-4">Your Devices</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-foreground">Your Devices</h2>
+              <Button
+                onClick={handleStartAutomation}
+                disabled={selectedDeviceIds.length === 0}
+                className="gap-2"
+              >
+                <Play className="w-4 h-4" />
+                Start Selected ({selectedDeviceIds.length})
+              </Button>
+            </div>
             <DeviceTable onSelectionChange={setSelectedDeviceIds} />
           </div>
         </main>

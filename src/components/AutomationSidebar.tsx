@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { 
+import {
   Zap,
   Flame,
   UserPlus,
-  Play
+  Play,
+  Sun,
+  Moon
 } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -117,7 +120,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
   const [activeMode, setActiveMode] = useState<"warmup" | "follow">("warmup");
   const [selectedDay, setSelectedDay] = useState<DayKey>(1);
   const [warmupConfigs, setWarmupConfigs] = useState(defaultWarmupConfigs);
-  
+  const { theme, setTheme } = useTheme();
+
   // Follow config state
   const [followConfig, setFollowConfig] = useState({
     batchSize: 100,
@@ -157,7 +161,7 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
             <Zap className="w-6 h-6 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-semibold text-foreground">CloudPhone</h1>
+            <h1 className="font-semibold text-foreground">Insta Automations</h1>
             <p className="text-xs text-muted-foreground">Control Panel</p>
           </div>
         </div>
@@ -242,12 +246,12 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label className="text-xs text-muted-foreground">Feed Scrolls</Label>
-                  <Switch 
-                    checked={currentWarmup.feed.enabled} 
-                    onCheckedChange={(checked) => updateWarmupConfig({ 
-                      feed: { ...currentWarmup.feed, enabled: checked } 
+                  <Switch
+                    checked={currentWarmup.feed.enabled}
+                    onCheckedChange={(checked) => updateWarmupConfig({
+                      feed: { ...currentWarmup.feed, enabled: checked }
                     })}
-                    className="scale-75" 
+                    className="scale-75"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -280,12 +284,12 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <Label className="text-xs text-muted-foreground">Reels (minutes)</Label>
-                  <Switch 
-                    checked={currentWarmup.reels.enabled} 
-                    onCheckedChange={(checked) => updateWarmupConfig({ 
-                      reels: { ...currentWarmup.reels, enabled: checked } 
+                  <Switch
+                    checked={currentWarmup.reels.enabled}
+                    onCheckedChange={(checked) => updateWarmupConfig({
+                      reels: { ...currentWarmup.reels, enabled: checked }
                     })}
-                    className="scale-75" 
+                    className="scale-75"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -479,7 +483,7 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
       {/* Start Button - Only for Follow Automation */}
       {activeMode === "follow" && (
         <div className="p-4 border-t border-border">
-          <Button 
+          <Button
             onClick={onStartAutomation}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
             size="lg"
@@ -491,16 +495,19 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
       )}
 
       {/* Footer */}
-      <div className="p-4 border-t border-border">
-        <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-muted/30">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <span className="text-sm font-medium text-primary">A</span>
+      <div className="p-4 border-t border-border space-y-4">
+        <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-muted/30">
+          <div className="flex items-center gap-2">
+            {theme === "dark" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            <span className="text-sm font-medium">Dark Mode</span>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">Admin User</p>
-            <p className="text-xs text-muted-foreground">Pro Plan</p>
-          </div>
+          <Switch
+            checked={theme === "dark"}
+            onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+          />
         </div>
+
+
       </div>
     </aside>
   );

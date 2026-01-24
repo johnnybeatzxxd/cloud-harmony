@@ -9,6 +9,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -20,14 +29,13 @@ interface Device {
   isPlaying: boolean;
 }
 
-const mockDevices: Device[] = [
-  { id: "1", name: "Galaxy S23 Ultra", status: "running", followCap: { current: 145, max: 200 }, isPlaying: true },
-  { id: "2", name: "iPhone 15 Pro", status: "online", followCap: { current: 50, max: 150 }, isPlaying: false },
-  { id: "3", name: "Pixel 8 Pro", status: "paused", followCap: { current: 200, max: 200 }, isPlaying: false },
-  { id: "4", name: "OnePlus 12", status: "running", followCap: { current: 89, max: 300 }, isPlaying: true },
-  { id: "5", name: "Samsung A54", status: "offline", followCap: { current: 0, max: 100 }, isPlaying: false },
-  { id: "6", name: "Xiaomi 14", status: "running", followCap: { current: 178, max: 250 }, isPlaying: true },
-];
+const mockDevices: Device[] = Array.from({ length: 20 }, (_, i) => ({
+  id: String(i + 1),
+  name: `Device ${i + 1}`,
+  status: Math.random() > 0.5 ? "running" : Math.random() > 0.5 ? "online" : "paused",
+  followCap: { current: Math.floor(Math.random() * 200), max: 200 },
+  isPlaying: Math.random() > 0.5,
+}));
 
 const logMessages = [
   "Following @user_x23...",
@@ -143,16 +151,27 @@ interface DeviceTableProps {
 export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
   const [devices, setDevices] = useState(mockDevices);
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  useEffect(() => {
+    setDevices(mockDevices);
+  }, []);
+
+  const totalPages = Math.ceil(devices.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentDevices = devices.slice(startIndex, endIndex);
 
   const togglePlayPause = (id: string) => {
     setDevices((prev) =>
       prev.map((device) =>
         device.id === id
           ? {
-              ...device,
-              isPlaying: !device.isPlaying,
-              status: device.isPlaying ? "paused" : "running",
-            }
+            ...device,
+            isPlaying: !device.isPlaying,
+            status: device.isPlaying ? "paused" : "running",
+          }
           : device
       )
     );
@@ -190,7 +209,7 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
       {/* Header */}
       <div className="grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
         <div className="flex items-center justify-center">
-          <Checkbox 
+          <Checkbox
             checked={isAllSelected}
             ref={(ref) => {
               if (ref) {
@@ -210,100 +229,102 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
       </div>
 
       {/* Body */}
-      <div className="divide-y divide-border">
-        {devices.map((device, index) => (
-          <div
-            key={device.id}
-            className={cn(
-              "grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 items-center transition-colors",
-              selectedDevices.has(device.id) ? "bg-primary/5" : "hover:bg-muted/10"
-            )}
-            style={{ animationDelay: `${index * 50}ms` }}
-          >
-            {/* Checkbox */}
-            <div className="flex items-center justify-center">
-              <Checkbox 
-                checked={selectedDevices.has(device.id)}
-                onCheckedChange={() => toggleDeviceSelection(device.id)}
-                className="border-muted-foreground/50"
-              />
-            </div>
-
-            {/* Device Name */}
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
-                selectedDevices.has(device.id) ? "bg-primary/20" : "bg-primary/10"
-              )}>
-                <Smartphone className="w-5 h-5 text-primary" />
+      <ScrollArea className="h-[600px]">
+        <div className="divide-y divide-border">
+          {currentDevices.map((device, index) => (
+            <div
+              key={device.id}
+              className={cn(
+                "grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 items-center transition-colors",
+                selectedDevices.has(device.id) ? "bg-primary/5" : "hover:bg-muted/10"
+              )}
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              {/* Checkbox */}
+              <div className="flex items-center justify-center">
+                <Checkbox
+                  checked={selectedDevices.has(device.id)}
+                  onCheckedChange={() => toggleDeviceSelection(device.id)}
+                  className="border-muted-foreground/50"
+                />
               </div>
-              <div>
-                <span className="font-medium text-foreground">{device.name}</span>
-                <p className="text-xs text-muted-foreground">ID: {device.id}</p>
+
+              {/* Device Name */}
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                  selectedDevices.has(device.id) ? "bg-primary/20" : "bg-primary/10"
+                )}>
+                  <Smartphone className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <span className="font-medium text-foreground">{device.name}</span>
+                  <p className="text-xs text-muted-foreground">ID: {device.id}</p>
+                </div>
               </div>
-            </div>
 
-            {/* Status */}
-            <StatusBadge status={device.status} />
+              {/* Status */}
+              <StatusBadge status={device.status} />
 
-            {/* Follow Cap */}
-            <FollowCapProgress current={device.followCap.current} max={device.followCap.max} />
+              {/* Follow Cap */}
+              <FollowCapProgress current={device.followCap.current} max={device.followCap.max} />
 
-            {/* Logs */}
-            <AnimatedLog isActive={device.isPlaying} />
+              {/* Logs */}
+              <AnimatedLog isActive={device.isPlaying} />
 
-            {/* Play/Pause */}
-            <div className="flex justify-center">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => togglePlayPause(device.id)}
-                disabled={device.status === "offline"}
-                className={cn(
-                  "rounded-full transition-all",
-                  device.isPlaying
-                    ? "bg-primary/10 text-primary hover:bg-primary/20"
-                    : "hover:bg-muted"
-                )}
-              >
-                {device.isPlaying ? (
-                  <Pause className="w-5 h-5" />
-                ) : (
-                  <Play className="w-5 h-5" />
-                )}
-              </Button>
-            </div>
-
-            {/* More Options */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
+              {/* Play/Pause */}
+              <div className="flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => togglePlayPause(device.id)}
+                  disabled={device.status === "offline"}
+                  className={cn(
+                    "rounded-full transition-all",
+                    device.isPlaying
+                      ? "bg-primary/10 text-primary hover:bg-primary/20"
+                      : "hover:bg-muted"
+                  )}
+                >
+                  {device.isPlaying ? (
+                    <Pause className="w-5 h-5" />
+                  ) : (
+                    <Play className="w-5 h-5" />
+                  )}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem>
-                  <StopCircle className="w-4 h-4 mr-2" />
-                  Stop Automation
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Restart Device
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Device Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive focus:text-destructive">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Remove Device
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        ))}
-      </div>
+              </div>
+
+              {/* More Options */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="rounded-full">
+                    <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem>
+                    <StopCircle className="w-4 h-4 mr-2" />
+                    Stop Automation
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Restart Device
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <Settings className="w-4 h-4 mr-2" />
+                    Device Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem className="text-destructive focus:text-destructive">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Remove Device
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
 
       {/* Footer */}
       <div className="px-6 py-3 bg-muted/20 border-t border-border flex justify-between items-center">
@@ -315,6 +336,37 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
             {selectedDevices.size} selected
           </p>
         )}
+      </div>
+
+      {/* Pagination */}
+      <div className="p-4 border-t border-border">
+        <Pagination>
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <PaginationItem key={page}>
+                <PaginationLink
+                  isActive={currentPage === page}
+                  onClick={() => setCurrentPage(page)}
+                  className="cursor-pointer"
+                >
+                  {page}
+                </PaginationLink>
+              </PaginationItem>
+            ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
       </div>
     </div>
   );

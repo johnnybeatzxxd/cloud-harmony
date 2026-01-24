@@ -34,7 +34,7 @@ export function DashboardHeader() {
         {/* Add Device */}
         <Button className="gap-2">
           <Plus className="w-4 h-4" />
-          Add Device
+          Add Leads
         </Button>
       </div>
     </header>

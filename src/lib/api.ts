@@ -22,6 +22,7 @@ export interface Account {
     status: string;
     daily_limit: number;
     cooldown_until: string | null;
+    stream_url?: string | null;
 }
 
 export interface AccountStats {

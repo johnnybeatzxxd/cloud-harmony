@@ -34,6 +34,7 @@ interface Device {
     recent_2h: number;
     rolling_24h: number;
   };
+  streamUrl: string | null;
 }
 
 // Map backend Account to frontend Device interface
@@ -44,7 +45,8 @@ function mapAccountToDevice(account: AccountWithStats): Device {
     status: account.runtime_status, // Use raw runtime_status as requested
     followCap: { current: 0, max: account.daily_limit },
     isPlaying: account.is_enabled && account.runtime_status === "RUNNING", // Check specific running state
-    stats: account.stats || { recent_2h: 0, rolling_24h: 0 }
+    stats: account.stats || { recent_2h: 0, rolling_24h: 0 },
+    streamUrl: account.stream_url || null
   };
 }
 
@@ -405,9 +407,12 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
                     <RotateCcw className="w-4 h-4 mr-2" />
                     Restart Device
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => device.streamUrl && window.open(device.streamUrl, '_blank')}
+                    disabled={!device.streamUrl}
+                  >
                     <Settings className="w-4 h-4 mr-2" />
-                    Device Settings
+                    Open Stream
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive focus:text-destructive">

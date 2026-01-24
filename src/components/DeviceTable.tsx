@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Play, Pause, MoreHorizontal, Smartphone, StopCircle, RotateCcw, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,8 +136,13 @@ function FollowCapProgress({ current, max }: { current: number; max: number }) {
   );
 }
 
-export function DeviceTable() {
+interface DeviceTableProps {
+  onSelectionChange?: (selectedIds: string[]) => void;
+}
+
+export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
   const [devices, setDevices] = useState(mockDevices);
+  const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
 
   const togglePlayPause = (id: string) => {
     setDevices((prev) =>
@@ -152,10 +158,49 @@ export function DeviceTable() {
     );
   };
 
+  const toggleDeviceSelection = (id: string) => {
+    setSelectedDevices((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      onSelectionChange?.(Array.from(newSet));
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedDevices.size === devices.length) {
+      setSelectedDevices(new Set());
+      onSelectionChange?.([]);
+    } else {
+      const allIds = devices.map(d => d.id);
+      setSelectedDevices(new Set(allIds));
+      onSelectionChange?.(allIds);
+    }
+  };
+
+  const isAllSelected = selectedDevices.size === devices.length && devices.length > 0;
+  const isPartiallySelected = selectedDevices.size > 0 && selectedDevices.size < devices.length;
+
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="grid grid-cols-[1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
+      <div className="grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
+        <div className="flex items-center justify-center">
+          <Checkbox 
+            checked={isAllSelected}
+            ref={(ref) => {
+              if (ref) {
+                (ref as HTMLButtonElement).dataset.state = isPartiallySelected ? "indeterminate" : isAllSelected ? "checked" : "unchecked";
+              }
+            }}
+            onCheckedChange={toggleSelectAll}
+            className="border-muted-foreground/50"
+          />
+        </div>
         <div className="text-sm font-semibold text-foreground">Device</div>
         <div className="text-sm font-semibold text-foreground">Status</div>
         <div className="text-sm font-semibold text-foreground">Follow Cap</div>
@@ -169,12 +214,27 @@ export function DeviceTable() {
         {devices.map((device, index) => (
           <div
             key={device.id}
-            className="grid grid-cols-[1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 items-center hover:bg-muted/10 transition-colors"
+            className={cn(
+              "grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 items-center transition-colors",
+              selectedDevices.has(device.id) ? "bg-primary/5" : "hover:bg-muted/10"
+            )}
             style={{ animationDelay: `${index * 50}ms` }}
           >
+            {/* Checkbox */}
+            <div className="flex items-center justify-center">
+              <Checkbox 
+                checked={selectedDevices.has(device.id)}
+                onCheckedChange={() => toggleDeviceSelection(device.id)}
+                className="border-muted-foreground/50"
+              />
+            </div>
+
             {/* Device Name */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <div className={cn(
+                "w-10 h-10 rounded-lg flex items-center justify-center transition-colors",
+                selectedDevices.has(device.id) ? "bg-primary/20" : "bg-primary/10"
+              )}>
                 <Smartphone className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -246,10 +306,15 @@ export function DeviceTable() {
       </div>
 
       {/* Footer */}
-      <div className="px-6 py-3 bg-muted/20 border-t border-border">
+      <div className="px-6 py-3 bg-muted/20 border-t border-border flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
           {devices.length} devices • {devices.filter((d) => d.status === "running").length} running
         </p>
+        {selectedDevices.size > 0 && (
+          <p className="text-sm text-primary font-medium">
+            {selectedDevices.size} selected
+          </p>
+        )}
       </div>
     </div>
   );

@@ -1,24 +1,16 @@
 import { useState } from "react";
 import { 
   Zap,
-  ChevronRight,
-  LayoutDashboard,
   Flame,
   UserPlus,
-  Users,
-  Settings
+  Play
 } from "lucide-react";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -26,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface NavItemProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -51,43 +44,14 @@ function NavItem({ icon: Icon, label, isActive, onClick }: NavItemProps) {
   );
 }
 
-interface ConfigSectionProps {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}
-
-function ConfigSection({ icon: Icon, title, children, defaultOpen = false }: ConfigSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <CollapsibleTrigger className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg hover:bg-muted/50 transition-colors group">
-        <div className="flex items-center gap-3">
-          <Icon className="w-5 h-5 text-primary" />
-          <span className="text-sm font-medium text-foreground">{title}</span>
-        </div>
-        <ChevronRight className={cn(
-          "w-4 h-4 text-muted-foreground transition-transform",
-          isOpen && "rotate-90"
-        )} />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="px-3 pb-2 space-y-4 pt-2">
-        {children}
-      </CollapsibleContent>
-    </Collapsible>
-  );
-}
-
-// Warmup configurations by day
-const warmupConfigs = {
+// Warmup configurations by day - now with state management
+const defaultWarmupConfigs = {
   1: {
     label: "Day 1 - The Ghost",
     feed: { enabled: true, minScrolls: 13, maxScrolls: 20 },
     reels: { enabled: true, minMinutes: 3, maxMinutes: 6 },
     limits: { maxLikes: 3, maxFollows: 2 },
-    speed: "slow",
+    speed: "slow" as const,
     chance: { follow: 30, like: 20, comment: 20 }
   },
   2: {
@@ -95,7 +59,7 @@ const warmupConfigs = {
     feed: { enabled: true, minScrolls: 18, maxScrolls: 25 },
     reels: { enabled: true, minMinutes: 5, maxMinutes: 8 },
     limits: { maxLikes: 5, maxFollows: 3 },
-    speed: "slow",
+    speed: "slow" as const,
     chance: { follow: 20, like: 30, comment: 20 }
   },
   3: {
@@ -103,7 +67,7 @@ const warmupConfigs = {
     feed: { enabled: true, minScrolls: 25, maxScrolls: 30 },
     reels: { enabled: true, minMinutes: 5, maxMinutes: 10 },
     limits: { maxLikes: 10, maxFollows: 5 },
-    speed: "normal",
+    speed: "normal" as const,
     chance: { follow: 20, like: 30, comment: 30 }
   },
   4: {
@@ -111,7 +75,7 @@ const warmupConfigs = {
     feed: { enabled: true, minScrolls: 45, maxScrolls: 50 },
     reels: { enabled: true, minMinutes: 10, maxMinutes: 15 },
     limits: { maxLikes: 15, maxFollows: 8 },
-    speed: "normal",
+    speed: "normal" as const,
     chance: { follow: 20, like: 30, comment: 30 }
   },
   5: {
@@ -119,7 +83,7 @@ const warmupConfigs = {
     feed: { enabled: true, minScrolls: 45, maxScrolls: 55 },
     reels: { enabled: true, minMinutes: 15, maxMinutes: 20 },
     limits: { maxLikes: 30, maxFollows: 8 },
-    speed: "normal",
+    speed: "normal" as const,
     chance: { follow: 20, like: 25, comment: 30 }
   },
   6: {
@@ -127,7 +91,7 @@ const warmupConfigs = {
     feed: { enabled: true, minScrolls: 50, maxScrolls: 60 },
     reels: { enabled: true, minMinutes: 15, maxMinutes: 26 },
     limits: { maxLikes: 30, maxFollows: 10 },
-    speed: "fast",
+    speed: "fast" as const,
     chance: { follow: 20, like: 35, comment: 30 }
   },
   7: {
@@ -135,16 +99,24 @@ const warmupConfigs = {
     feed: { enabled: true, minScrolls: 55, maxScrolls: 65 },
     reels: { enabled: true, minMinutes: 15, maxMinutes: 25 },
     limits: { maxLikes: 30, maxFollows: 12 },
-    speed: "fast",
+    speed: "fast" as const,
     chance: { follow: 40, like: 40, comment: 35 }
   }
 };
 
-type DayKey = keyof typeof warmupConfigs;
+type DayKey = keyof typeof defaultWarmupConfigs;
+type SpeedType = "slow" | "normal" | "fast";
+type WarmupConfig = typeof defaultWarmupConfigs[DayKey];
 
-export function AutomationSidebar() {
-  const [activeNav, setActiveNav] = useState("dashboard");
+interface AutomationSidebarProps {
+  onStartAutomation?: () => void;
+  selectedDeviceCount?: number;
+}
+
+export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }: AutomationSidebarProps) {
+  const [activeMode, setActiveMode] = useState<"warmup" | "follow">("warmup");
   const [selectedDay, setSelectedDay] = useState<DayKey>(1);
+  const [warmupConfigs, setWarmupConfigs] = useState(defaultWarmupConfigs);
   
   // Follow config state
   const [followConfig, setFollowConfig] = useState({
@@ -159,6 +131,13 @@ export function AutomationSidebar() {
   });
 
   const currentWarmup = warmupConfigs[selectedDay];
+
+  const updateWarmupConfig = (updates: Partial<WarmupConfig>) => {
+    setWarmupConfigs(prev => ({
+      ...prev,
+      [selectedDay]: { ...prev[selectedDay], ...updates }
+    }));
+  };
 
   const getSpeedColor = (speed: string) => {
     switch (speed) {
@@ -184,39 +163,35 @@ export function AutomationSidebar() {
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* Mode Selection */}
       <nav className="p-4 space-y-1">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-3">
+          Select Mode
+        </p>
         <NavItem
-          icon={LayoutDashboard}
-          label="Dashboard"
-          isActive={activeNav === "dashboard"}
-          onClick={() => setActiveNav("dashboard")}
+          icon={Flame}
+          label="Warmup"
+          isActive={activeMode === "warmup"}
+          onClick={() => setActiveMode("warmup")}
         />
         <NavItem
-          icon={Users}
-          label="Devices"
-          isActive={activeNav === "devices"}
-          onClick={() => setActiveNav("devices")}
-        />
-        <NavItem
-          icon={Settings}
-          label="Settings"
-          isActive={activeNav === "settings"}
-          onClick={() => setActiveNav("settings")}
+          icon={UserPlus}
+          label="Follow Automation"
+          isActive={activeMode === "follow"}
+          onClick={() => setActiveMode("follow")}
         />
       </nav>
 
       <Separator className="mx-4" />
 
-      {/* Automation Config */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-3 mb-3">
-          Automation Config
-        </p>
-
-        {/* Warmup Section */}
-        <ConfigSection icon={Flame} title="Warmup" defaultOpen>
+      {/* Config Content */}
+      <ScrollArea className="flex-1 p-4">
+        {activeMode === "warmup" ? (
           <div className="space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              Warmup Configuration
+            </p>
+
             {/* Day Selector */}
             <div className="space-y-2">
               <Label className="text-sm">Select Day</Label>
@@ -237,180 +212,283 @@ export function AutomationSidebar() {
               </Select>
             </div>
 
-            {/* Current Day Config Display */}
-            <div className="space-y-3 p-3 rounded-lg bg-muted/30 border border-border">
+            {/* Editable Config */}
+            <div className="space-y-4 p-3 rounded-lg bg-muted/30 border border-border">
               {/* Speed */}
-              <div className="flex justify-between items-center">
-                <span className="text-xs text-muted-foreground">Speed</span>
-                <span className={cn("text-xs font-medium uppercase", getSpeedColor(currentWarmup.speed))}>
-                  {currentWarmup.speed}
-                </span>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Speed</Label>
+                <Select
+                  value={currentWarmup.speed}
+                  onValueChange={(val: SpeedType) => updateWarmupConfig({ speed: val })}
+                >
+                  <SelectTrigger className="w-full h-8">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="slow">
+                      <span className="text-green-400">Slow</span>
+                    </SelectItem>
+                    <SelectItem value="normal">
+                      <span className="text-yellow-400">Normal</span>
+                    </SelectItem>
+                    <SelectItem value="fast">
+                      <span className="text-red-400">Fast</span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {/* Feed */}
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Feed Scrolls</span>
-                  <div className="flex items-center gap-1">
-                    <Switch checked={currentWarmup.feed.enabled} disabled className="scale-75" />
-                  </div>
+                  <Label className="text-xs text-muted-foreground">Feed Scrolls</Label>
+                  <Switch 
+                    checked={currentWarmup.feed.enabled} 
+                    onCheckedChange={(checked) => updateWarmupConfig({ 
+                      feed: { ...currentWarmup.feed, enabled: checked } 
+                    })}
+                    className="scale-75" 
+                  />
                 </div>
-                <div className="flex gap-2">
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Min</p>
-                    <p className="text-sm font-medium text-foreground">{currentWarmup.feed.minScrolls}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Min</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.feed.minScrolls}
+                      onChange={(e) => updateWarmupConfig({
+                        feed: { ...currentWarmup.feed, minScrolls: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Max</p>
-                    <p className="text-sm font-medium text-foreground">{currentWarmup.feed.maxScrolls}</p>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Max</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.feed.maxScrolls}
+                      onChange={(e) => updateWarmupConfig({
+                        feed: { ...currentWarmup.feed, maxScrolls: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Reels */}
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-muted-foreground">Reels (minutes)</span>
-                  <Switch checked={currentWarmup.reels.enabled} disabled className="scale-75" />
+                  <Label className="text-xs text-muted-foreground">Reels (minutes)</Label>
+                  <Switch 
+                    checked={currentWarmup.reels.enabled} 
+                    onCheckedChange={(checked) => updateWarmupConfig({ 
+                      reels: { ...currentWarmup.reels, enabled: checked } 
+                    })}
+                    className="scale-75" 
+                  />
                 </div>
-                <div className="flex gap-2">
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Min</p>
-                    <p className="text-sm font-medium text-foreground">{currentWarmup.reels.minMinutes}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Min</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.reels.minMinutes}
+                      onChange={(e) => updateWarmupConfig({
+                        reels: { ...currentWarmup.reels, minMinutes: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Max</p>
-                    <p className="text-sm font-medium text-foreground">{currentWarmup.reels.maxMinutes}</p>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Max</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.reels.maxMinutes}
+                      onChange={(e) => updateWarmupConfig({
+                        reels: { ...currentWarmup.reels, maxMinutes: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Limits */}
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Limits</span>
-                <div className="flex gap-2">
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Likes</p>
-                    <p className="text-sm font-medium text-foreground">{currentWarmup.limits.maxLikes}</p>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Limits</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Max Likes</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.limits.maxLikes}
+                      onChange={(e) => updateWarmupConfig({
+                        limits: { ...currentWarmup.limits, maxLikes: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Follows</p>
-                    <p className="text-sm font-medium text-foreground">{currentWarmup.limits.maxFollows}</p>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Max Follows</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.limits.maxFollows}
+                      onChange={(e) => updateWarmupConfig({
+                        limits: { ...currentWarmup.limits, maxFollows: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </div>
               </div>
 
               {/* Chances */}
-              <div className="space-y-1">
-                <span className="text-xs text-muted-foreground">Chances (%)</span>
-                <div className="flex gap-2">
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Follow</p>
-                    <p className="text-sm font-medium text-primary">{currentWarmup.chance.follow}%</p>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Chances (%)</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Follow</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.chance.follow}
+                      onChange={(e) => updateWarmupConfig({
+                        chance: { ...currentWarmup.chance, follow: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Like</p>
-                    <p className="text-sm font-medium text-primary">{currentWarmup.chance.like}%</p>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Like</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.chance.like}
+                      onChange={(e) => updateWarmupConfig({
+                        chance: { ...currentWarmup.chance, like: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
-                  <div className="flex-1 p-2 rounded bg-muted/50 text-center">
-                    <p className="text-xs text-muted-foreground">Comment</p>
-                    <p className="text-sm font-medium text-primary">{currentWarmup.chance.comment}%</p>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Comment</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.chance.comment}
+                      onChange={(e) => updateWarmupConfig({
+                        chance: { ...currentWarmup.chance, comment: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </ConfigSection>
-
-        {/* Follow Automation Section */}
-        <ConfigSection icon={UserPlus} title="Follow Automation">
+        ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Batch Size</Label>
-                <Input
-                  type="number"
-                  value={followConfig.batchSize}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, batchSize: Number(e.target.value) }))}
-                  className="h-8 text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Session Limit (2h)</Label>
-                <Input
-                  type="number"
-                  value={followConfig.sessionLimit2h}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, sessionLimit2h: Number(e.target.value) }))}
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              Follow Configuration
+            </p>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-4 p-3 rounded-lg bg-muted/30 border border-border">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Batch Size</Label>
+                  <Input
+                    type="number"
+                    value={followConfig.batchSize}
+                    onChange={(e) => setFollowConfig(prev => ({ ...prev, batchSize: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Session Limit (2h)</Label>
+                  <Input
+                    type="number"
+                    value={followConfig.sessionLimit2h}
+                    onChange={(e) => setFollowConfig(prev => ({ ...prev, sessionLimit2h: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Min Batch Start</Label>
+                  <Input
+                    type="number"
+                    value={followConfig.minBatchStart}
+                    onChange={(e) => setFollowConfig(prev => ({ ...prev, minBatchStart: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Cooldown (hours)</Label>
+                  <Input
+                    type="number"
+                    step="0.5"
+                    value={followConfig.cooldownHours}
+                    onChange={(e) => setFollowConfig(prev => ({ ...prev, cooldownHours: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-1">
-                <Label className="text-xs">Min Batch Start</Label>
+                <Label className="text-xs">Pattern Break</Label>
                 <Input
                   type="number"
-                  value={followConfig.minBatchStart}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, minBatchStart: Number(e.target.value) }))}
+                  value={followConfig.patternBreak}
+                  onChange={(e) => setFollowConfig(prev => ({ ...prev, patternBreak: Number(e.target.value) }))}
                   className="h-8 text-sm"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Cooldown (hours)</Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  value={followConfig.cooldownHours}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, cooldownHours: Number(e.target.value) }))}
-                  className="h-8 text-sm"
-                />
-              </div>
-            </div>
 
-            <div className="space-y-1">
-              <Label className="text-xs">Pattern Break</Label>
-              <Input
-                type="number"
-                value={followConfig.patternBreak}
-                onChange={(e) => setFollowConfig(prev => ({ ...prev, patternBreak: Number(e.target.value) }))}
-                className="h-8 text-sm"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between">
+              <div className="space-y-2">
                 <Label className="text-xs">Delay Range (seconds)</Label>
-                <span className="text-xs text-primary font-medium">{followConfig.minDelay}s - {followConfig.maxDelay}s</span>
+                <div className="flex gap-2 items-center">
+                  <Input
+                    type="number"
+                    value={followConfig.minDelay}
+                    onChange={(e) => setFollowConfig(prev => ({ ...prev, minDelay: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                  <span className="text-muted-foreground text-xs">to</span>
+                  <Input
+                    type="number"
+                    value={followConfig.maxDelay}
+                    onChange={(e) => setFollowConfig(prev => ({ ...prev, maxDelay: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                </div>
               </div>
-              <div className="flex gap-2 items-center">
-                <Input
-                  type="number"
-                  value={followConfig.minDelay}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, minDelay: Number(e.target.value) }))}
-                  className="h-8 text-sm w-20"
-                />
-                <span className="text-muted-foreground">to</span>
-                <Input
-                  type="number"
-                  value={followConfig.maxDelay}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, maxDelay: Number(e.target.value) }))}
-                  className="h-8 text-sm w-20"
-                />
-              </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <Label htmlFor="do-vetting" className="text-sm">Enable Vetting</Label>
-              <Switch
-                id="do-vetting"
-                checked={followConfig.doVetting}
-                onCheckedChange={(checked) => setFollowConfig(prev => ({ ...prev, doVetting: checked }))}
-              />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="do-vetting" className="text-sm">Enable Vetting</Label>
+                <Switch
+                  id="do-vetting"
+                  checked={followConfig.doVetting}
+                  onCheckedChange={(checked) => setFollowConfig(prev => ({ ...prev, doVetting: checked }))}
+                />
+              </div>
             </div>
           </div>
-        </ConfigSection>
-      </div>
+        )}
+      </ScrollArea>
+
+      {/* Start Button - Only for Follow Automation */}
+      {activeMode === "follow" && (
+        <div className="p-4 border-t border-border">
+          <Button 
+            onClick={onStartAutomation}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+            size="lg"
+          >
+            <Play className="w-5 h-5" />
+            Start Selected ({selectedDeviceCount})
+          </Button>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-4 border-t border-border">

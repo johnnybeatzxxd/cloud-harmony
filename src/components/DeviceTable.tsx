@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
-import { Play, Pause, MoreHorizontal, Smartphone, StopCircle, RotateCcw, Settings, Trash2 } from "lucide-react";
+import { Play, Pause, MoreHorizontal, Smartphone, StopCircle, RotateCcw, Settings, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { accountsApi, automationApi, logsApi, AccountWithStats, LogEntry } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -24,62 +27,62 @@ import { cn } from "@/lib/utils";
 interface Device {
   id: string;
   name: string;
-  status: "online" | "offline" | "running" | "paused";
+  status: string; // Raw runtime_status
   followCap: { current: number; max: number };
   isPlaying: boolean;
+  stats: {
+    recent_2h: number;
+    rolling_24h: number;
+  };
 }
 
-const mockDevices: Device[] = Array.from({ length: 20 }, (_, i) => ({
-  id: String(i + 1),
-  name: `Device ${i + 1}`,
-  status: Math.random() > 0.5 ? "running" : Math.random() > 0.5 ? "online" : "paused",
-  followCap: { current: Math.floor(Math.random() * 200), max: 200 },
-  isPlaying: Math.random() > 0.5,
-}));
+// Map backend Account to frontend Device interface
+function mapAccountToDevice(account: AccountWithStats): Device {
+  return {
+    id: account.device_id,
+    name: account.profile_name || `Device ${account.device_id}`,
+    status: account.runtime_status, // Use raw runtime_status as requested
+    followCap: { current: 0, max: account.daily_limit },
+    isPlaying: account.is_enabled && account.runtime_status === "RUNNING", // Check specific running state
+    stats: account.stats || { recent_2h: 0, rolling_24h: 0 }
+  };
+}
 
-const logMessages = [
-  "Following @user_x23...",
-  "Liked post #4521",
-  "Comment sent successfully",
-  "Waiting 3.2s...",
-  "Following @tech_lover...",
-  "Profile viewed",
-  "Story watched",
-  "DM scheduled",
-  "Unfollowed inactive",
-  "Rate limit check OK",
-];
 
-function AnimatedLog({ isActive }: { isActive: boolean }) {
-  const [logs, setLogs] = useState<{ id: number; message: string }[]>([]);
-  const [counter, setCounter] = useState(0);
+function AnimatedLog({ isActive, deviceId }: { isActive: boolean; deviceId: string }) {
+  const [logs, setLogs] = useState<LogEntry[]>([]);
 
   useEffect(() => {
-    if (!isActive) return;
+    if (!isActive) {
+      setLogs([]); // Clear logs when inactive
+      return;
+    }
 
-    const interval = setInterval(() => {
-      const newLog = {
-        id: counter,
-        message: logMessages[Math.floor(Math.random() * logMessages.length)],
-      };
-      setLogs((prev) => [newLog, ...prev].slice(0, 3));
-      setCounter((c) => c + 1);
-    }, 1000 + Math.random() * 500);
+    // Connect to real-time log stream
+    const cleanup = logsApi.connectToLogStream(
+      deviceId,
+      (newLog) => {
+        setLogs((prev) => [newLog, ...prev].slice(0, 3));
+      },
+      (error) => {
+        console.error(`WebSocket error for device ${deviceId}:`, error);
+      }
+    );
 
-    return () => clearInterval(interval);
-  }, [isActive, counter]);
+    return cleanup;
+  }, [isActive, deviceId]);
 
   if (!isActive) {
-    return <span className="text-muted-foreground text-sm">Idle</span>;
+    return <span className="text-muted-foreground text-sm">-</span>;
   }
 
   return (
-    <div className="relative h-6 overflow-hidden w-40">
+    <div className="relative h-6 overflow-hidden w-full">
       {logs.map((log, index) => (
         <div
-          key={log.id}
+          key={`${log.id}-${index}`}
           className={cn(
-            "absolute left-0 text-sm font-mono text-primary truncate w-full",
+            "absolute left-0 text-sm font-mono text-primary w-full",
             index === 0 && "animate-fade-in-up"
           )}
           style={{
@@ -94,26 +97,28 @@ function AnimatedLog({ isActive }: { isActive: boolean }) {
   );
 }
 
-function StatusBadge({ status }: { status: Device["status"] }) {
-  const statusConfig = {
-    online: { label: "Online", className: "bg-success/10 text-success border-success/20" },
-    offline: { label: "Offline", className: "bg-muted/50 text-muted-foreground border-muted" },
-    running: { label: "Running", className: "bg-primary/10 text-primary border-primary/20" },
-    paused: { label: "Paused", className: "bg-warning/10 text-warning border-warning/20" },
-  };
+function StatusBadge({ status }: { status: string }) {
+  // Determine style based on status content
+  let className = "bg-muted/50 text-muted-foreground border-muted";
+  let dotClass = "bg-muted-foreground";
 
-  const config = statusConfig[status];
+  const s = status ? status.toUpperCase() : "UNKNOWN";
+
+  if (s === "RUNNING") {
+    className = "bg-primary/10 text-primary border-primary/20";
+    dotClass = "bg-primary animate-pulse-glow";
+  } else if (s === "READY" || s === "ACTIVE") {
+    className = "bg-success/10 text-success border-success/20";
+    dotClass = "bg-success";
+  } else if (s === "PAUSED" || s === "COOLDOWN") {
+    className = "bg-warning/10 text-warning border-warning/20";
+    dotClass = "bg-warning";
+  }
 
   return (
-    <Badge variant="outline" className={cn("font-medium", config.className)}>
-      <span className={cn(
-        "w-2 h-2 rounded-full mr-2",
-        status === "running" && "bg-primary animate-pulse-glow",
-        status === "online" && "bg-success",
-        status === "offline" && "bg-muted-foreground",
-        status === "paused" && "bg-warning"
-      )} />
-      {config.label}
+    <Badge variant="outline" className={cn("font-medium", className)}>
+      <span className={cn("w-2 h-2 rounded-full mr-2", dotClass)} />
+      {status || "Unknown"}
     </Badge>
   );
 }
@@ -149,14 +154,59 @@ interface DeviceTableProps {
 }
 
 export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
-  const [devices, setDevices] = useState(mockDevices);
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    setDevices(mockDevices);
-  }, []);
+  // Fetch automation status to get accounts with stats
+  const { data: statusData, isLoading, isError, error } = useQuery({
+    queryKey: ['automation-status'],
+    queryFn: automationApi.getStatus,
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+  });
+
+  const devices = (statusData?.accounts || []).map(mapAccountToDevice);
+
+  // Mutation for starting automation on a device
+  const startMutation = useMutation({
+    mutationFn: (deviceId: string) => automationApi.start({ device_ids: [deviceId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automation-status'] });
+      toast({
+        title: "Start signal sent",
+        description: "Automation start signal sent to device.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for stopping automation on a device
+  const stopMutation = useMutation({
+    mutationFn: (deviceId: string) => automationApi.stop({ device_ids: [deviceId] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automation-status'] });
+      toast({
+        title: "Stop signal sent",
+        description: "Automation stop signal sent to device.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   const totalPages = Math.ceil(devices.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -164,17 +214,14 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
   const currentDevices = devices.slice(startIndex, endIndex);
 
   const togglePlayPause = (id: string) => {
-    setDevices((prev) =>
-      prev.map((device) =>
-        device.id === id
-          ? {
-            ...device,
-            isPlaying: !device.isPlaying,
-            status: device.isPlaying ? "paused" : "running",
-          }
-          : device
-      )
-    );
+    const device = devices.find(d => d.id === id);
+    if (!device) return;
+
+    if (device.isPlaying) {
+      stopMutation.mutate(id);
+    } else {
+      startMutation.mutate(id);
+    }
   };
 
   const toggleDeviceSelection = (id: string) => {
@@ -204,10 +251,48 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
   const isAllSelected = selectedDevices.size === devices.length && devices.length > 0;
   const isPartiallySelected = selectedDevices.size > 0 && selectedDevices.size < devices.length;
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Loading devices...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="flex items-center justify-center h-96">
+          <div className="flex flex-col items-center gap-3 max-w-md text-center">
+            <AlertCircle className="w-12 h-12 text-destructive" />
+            <h3 className="text-lg font-semibold">Failed to load devices</h3>
+            <p className="text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : "An unexpected error occurred"}
+            </p>
+            <Button
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['automation-status'] })}
+              variant="outline"
+              size="sm"
+            >
+              Try Again
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
+      <div className="grid grid-cols-[40px,250px,110px,80px,80px,140px,1fr,60px,40px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
         <div className="flex items-center justify-center">
           <Checkbox
             checked={isAllSelected}
@@ -222,6 +307,8 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
         </div>
         <div className="text-sm font-semibold text-foreground">Device</div>
         <div className="text-sm font-semibold text-foreground">Status</div>
+        <div className="text-sm font-semibold text-foreground">2h</div>
+        <div className="text-sm font-semibold text-foreground">24h</div>
         <div className="text-sm font-semibold text-foreground">Follow Cap</div>
         <div className="text-sm font-semibold text-foreground">Logs</div>
         <div className="text-sm font-semibold text-foreground text-center">Control</div>
@@ -235,7 +322,7 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
             <div
               key={device.id}
               className={cn(
-                "grid grid-cols-[40px,1fr,120px,160px,180px,100px,50px] gap-4 px-6 py-4 items-center transition-colors",
+                "grid grid-cols-[40px,250px,110px,80px,80px,140px,1fr,60px,40px] gap-4 px-6 py-4 items-center transition-colors",
                 selectedDevices.has(device.id) ? "bg-primary/5" : "hover:bg-muted/10"
               )}
               style={{ animationDelay: `${index * 50}ms` }}
@@ -266,11 +353,19 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
               {/* Status */}
               <StatusBadge status={device.status} />
 
+              {/* Stats */}
+              <div className="text-sm font-mono text-muted-foreground">
+                {device.stats.recent_2h}
+              </div>
+              <div className="text-sm font-mono text-muted-foreground">
+                {device.stats.rolling_24h}
+              </div>
+
               {/* Follow Cap */}
               <FollowCapProgress current={device.followCap.current} max={device.followCap.max} />
 
               {/* Logs */}
-              <AnimatedLog isActive={device.isPlaying} />
+              <AnimatedLog isActive={device.isPlaying} deviceId={device.id} />
 
               {/* Play/Pause */}
               <div className="flex justify-center">
@@ -278,7 +373,7 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
                   variant="ghost"
                   size="icon"
                   onClick={() => togglePlayPause(device.id)}
-                  disabled={device.status === "offline"}
+                  disabled={device.status.toUpperCase() === "OFFLINE"}
                   className={cn(
                     "rounded-full transition-all",
                     device.isPlaying
@@ -329,7 +424,7 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
       {/* Footer */}
       <div className="px-6 py-3 bg-muted/20 border-t border-border flex justify-between items-center">
         <p className="text-sm text-muted-foreground">
-          {devices.length} devices • {devices.filter((d) => d.status === "running").length} running
+          {devices.length} devices • {devices.filter((d) => d.status.toUpperCase() === "RUNNING").length} running
         </p>
         {selectedDevices.size > 0 && (
           <p className="text-sm text-primary font-medium">

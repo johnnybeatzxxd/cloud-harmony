@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Zap,
   Flame,
@@ -14,6 +14,10 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { configApi, SessionConfig } from "@/lib/api";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -123,16 +127,58 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
   const { theme, setTheme } = useTheme();
 
   // Follow config state
-  const [followConfig, setFollowConfig] = useState({
-    batchSize: 100,
-    sessionLimit2h: 5,
-    minBatchStart: 1,
-    cooldownHours: 2.0,
-    patternBreak: 4,
-    minDelay: 20,
-    maxDelay: 45,
-    doVetting: true
+  const queryClient = useQueryClient();
+
+  // Fetch session config
+  const { data: sessionConfig, isLoading: isConfigLoading } = useQuery({
+    queryKey: ['session-config'],
+    queryFn: configApi.get,
+    refetchOnWindowFocus: false,
   });
+
+  // Update session config mutation
+  const updateConfigMutation = useMutation({
+    mutationFn: (newConfig: SessionConfig) => configApi.update(newConfig),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['session-config'] });
+      toast.success("Configuration saved");
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to save configuration: ${error.message}`);
+    }
+  });
+
+  // Local state for follow config, initialized from API data when available
+  const [localFollowConfig, setLocalFollowConfig] = useState<SessionConfig>({
+    batch_size: 100,
+    session_limit_2h: 5,
+    min_batch_start: 1,
+    cooldown_hours: 2.0,
+    pattern_break: 4,
+    min_delay: 20,
+    max_delay: 45,
+    do_vetting: true
+  });
+
+  // Sync local state with API data when it loads
+  useEffect(() => {
+    if (sessionConfig) {
+      setLocalFollowConfig(sessionConfig);
+    }
+  }, [sessionConfig]);
+
+  const handleConfigChange = (updates: Partial<SessionConfig>) => {
+    const newConfig = { ...localFollowConfig, ...updates };
+    setLocalFollowConfig(newConfig);
+    // Debounce this in a real app, or add a "Save" button. 
+    // For now, let's add a Save button or auto-save with debounce.
+    // The user didn't specify, but auto-save is nice. 
+    // Let's use a "Save Changes" button for explicit control as it's safer for config.
+  };
+
+  const saveConfig = () => {
+    updateConfigMutation.mutate(localFollowConfig);
+  };
 
   const currentWarmup = warmupConfigs[selectedDay];
 
@@ -400,8 +446,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                   <Label className="text-xs">Batch Size</Label>
                   <Input
                     type="number"
-                    value={followConfig.batchSize}
-                    onChange={(e) => setFollowConfig(prev => ({ ...prev, batchSize: Number(e.target.value) }))}
+                    value={localFollowConfig.batch_size}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, batch_size: Number(e.target.value) }))}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -409,8 +455,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                   <Label className="text-xs">Session Limit (2h)</Label>
                   <Input
                     type="number"
-                    value={followConfig.sessionLimit2h}
-                    onChange={(e) => setFollowConfig(prev => ({ ...prev, sessionLimit2h: Number(e.target.value) }))}
+                    value={localFollowConfig.session_limit_2h}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, session_limit_2h: Number(e.target.value) }))}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -421,8 +467,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                   <Label className="text-xs">Min Batch Start</Label>
                   <Input
                     type="number"
-                    value={followConfig.minBatchStart}
-                    onChange={(e) => setFollowConfig(prev => ({ ...prev, minBatchStart: Number(e.target.value) }))}
+                    value={localFollowConfig.min_batch_start}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, min_batch_start: Number(e.target.value) }))}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -431,8 +477,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                   <Input
                     type="number"
                     step="0.5"
-                    value={followConfig.cooldownHours}
-                    onChange={(e) => setFollowConfig(prev => ({ ...prev, cooldownHours: Number(e.target.value) }))}
+                    value={localFollowConfig.cooldown_hours}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, cooldown_hours: Number(e.target.value) }))}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -442,8 +488,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                 <Label className="text-xs">Pattern Break</Label>
                 <Input
                   type="number"
-                  value={followConfig.patternBreak}
-                  onChange={(e) => setFollowConfig(prev => ({ ...prev, patternBreak: Number(e.target.value) }))}
+                  value={localFollowConfig.pattern_break}
+                  onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, pattern_break: Number(e.target.value) }))}
                   className="h-8 text-sm"
                 />
               </div>
@@ -453,15 +499,15 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                 <div className="flex gap-2 items-center">
                   <Input
                     type="number"
-                    value={followConfig.minDelay}
-                    onChange={(e) => setFollowConfig(prev => ({ ...prev, minDelay: Number(e.target.value) }))}
+                    value={localFollowConfig.min_delay}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, min_delay: Number(e.target.value) }))}
                     className="h-8 text-sm"
                   />
                   <span className="text-muted-foreground text-xs">to</span>
                   <Input
                     type="number"
-                    value={followConfig.maxDelay}
-                    onChange={(e) => setFollowConfig(prev => ({ ...prev, maxDelay: Number(e.target.value) }))}
+                    value={localFollowConfig.max_delay}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, max_delay: Number(e.target.value) }))}
                     className="h-8 text-sm"
                   />
                 </div>
@@ -471,10 +517,22 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                 <Label htmlFor="do-vetting" className="text-sm">Enable Vetting</Label>
                 <Switch
                   id="do-vetting"
-                  checked={followConfig.doVetting}
-                  onCheckedChange={(checked) => setFollowConfig(prev => ({ ...prev, doVetting: checked }))}
+                  checked={localFollowConfig.do_vetting}
+                  onCheckedChange={(checked) => setLocalFollowConfig(prev => ({ ...prev, do_vetting: checked }))}
                 />
               </div>
+
+              <Button
+                onClick={saveConfig}
+                disabled={updateConfigMutation.isPending || isConfigLoading}
+                className="w-full"
+                variant="secondary"
+              >
+                {updateConfigMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Save Configuration
+              </Button>
             </div>
           </div>
         )}

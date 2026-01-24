@@ -1,5 +1,7 @@
-import { Smartphone, Activity, UserPlus, AlertTriangle } from "lucide-react";
+import { Smartphone, Activity, UserPlus, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import { automationApi } from "@/lib/api";
 
 interface StatItemProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -40,6 +42,31 @@ function StatItem({ icon: Icon, label, value, change, changeType = "neutral", ic
 }
 
 export function StatsCards() {
+  const { data: statusData, isLoading } = useQuery({
+    queryKey: ['automation-status'],
+    queryFn: automationApi.getStatus,
+    refetchInterval: 5000,
+  });
+
+  const accounts = statusData?.accounts || [];
+
+  const totalDevices = accounts.length;
+  const activeAutomations = accounts.filter(a => a.runtime_status?.toLowerCase() === 'running').length;
+  const followsToday = accounts.reduce((sum, a) => sum + (a.stats?.rolling_24h || 0), 0);
+  // Count devices in cooldown or error as warnings
+  const warnings = accounts.filter(a =>
+    a.runtime_status?.toLowerCase() === 'cooldown' ||
+    a.status?.toLowerCase() === 'error'
+  ).length;
+
+  if (isLoading) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-4 shadow-sm h-[100px] flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
       <div className="flex items-center justify-between divide-x divide-border">
@@ -47,9 +74,9 @@ export function StatsCards() {
           <StatItem
             icon={Smartphone}
             label="Total Devices"
-            value="6"
-            change="+2"
-            changeType="positive"
+            value={totalDevices}
+            // change="+2" // We don't have historical data for change yet
+            // changeType="positive"
             iconClassName="bg-primary/10 text-primary"
           />
         </div>
@@ -57,7 +84,7 @@ export function StatsCards() {
           <StatItem
             icon={Activity}
             label="Active Automations"
-            value="3"
+            value={activeAutomations}
             iconClassName="bg-success/10 text-success"
           />
         </div>
@@ -65,9 +92,9 @@ export function StatsCards() {
           <StatItem
             icon={UserPlus}
             label="Follows Today"
-            value="1,247"
-            change="+12%"
-            changeType="positive"
+            value={followsToday.toLocaleString()}
+            // change="+12%" 
+            // changeType="positive"
             iconClassName="bg-chart-2/20 text-chart-2"
           />
         </div>
@@ -75,9 +102,9 @@ export function StatsCards() {
           <StatItem
             icon={AlertTriangle}
             label="Warnings"
-            value="2"
-            change="Action needed"
-            changeType="negative"
+            value={warnings}
+            change={warnings > 0 ? "Action needed" : "All good"}
+            changeType={warnings > 0 ? "negative" : "positive"}
             iconClassName="bg-warning/10 text-warning"
           />
         </div>

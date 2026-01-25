@@ -5,7 +5,10 @@ import {
   UserPlus,
   Play,
   Sun,
-  Moon
+  Moon,
+  RefreshCw,
+  Clock,
+  Info
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { Switch } from "@/components/ui/switch";
@@ -26,6 +29,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface NavItemProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -48,6 +57,23 @@ function NavItem({ icon: Icon, label, isActive, onClick }: NavItemProps) {
       <Icon className="w-5 h-5" />
       {label}
     </button>
+  );
+}
+
+function HelpTooltip({ text }: { text: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <button type="button" className="inline-flex items-center justify-center">
+            <Info className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground cursor-help transition-colors" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[200px] text-xs p-2 bg-popover text-popover-foreground border border-border shadow-md">
+          <p className="leading-relaxed">{text}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
@@ -157,8 +183,21 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
     pattern_break: 4,
     min_delay: 20,
     max_delay: 45,
-    do_vetting: true
+    do_vetting: true,
+    continuous_mode: false
   });
+
+  const DEFAULT_CONFIG = {
+    batch_size: 100,
+    session_limit_2h: 5,
+    min_batch_start: 1,
+    cooldown_hours: 2.0,
+    pattern_break: 4,
+    min_delay: 20,
+    max_delay: 45,
+    do_vetting: true,
+    continuous_mode: true
+  };
 
   // Sync local state with API data when it loads
   useEffect(() => {
@@ -177,7 +216,11 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
   };
 
   const saveConfig = () => {
-    updateConfigMutation.mutate(localFollowConfig);
+    const payload = { ...localFollowConfig };
+    if (!payload.continuous_mode) {
+      payload.cooldown_hours = 0.0;
+    }
+    updateConfigMutation.mutate(payload);
   };
 
   const currentWarmup = warmupConfigs[selectedDay];
@@ -199,7 +242,7 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
   };
 
   return (
-    <aside className="w-72 h-screen bg-card border-r border-border flex flex-col">
+    <aside className="w-80 h-screen bg-card border-r border-border flex flex-col">
       {/* Logo */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
@@ -440,10 +483,51 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
               Follow Configuration
             </p>
 
+            <div className="p-1 bg-muted/50 rounded-xl border border-border/50 backdrop-blur-sm relative flex mb-6">
+              {/* Sliding Pill Background */}
+              <div
+                className={cn(
+                  "absolute inset-y-1 transition-all duration-300 ease-out bg-primary rounded-lg shadow-sm",
+                  localFollowConfig.continuous_mode ? "left-1 w-[calc(50%-4px)]" : "left-[calc(50%+2px)] w-[calc(50%-4px)]"
+                )}
+              />
+
+              <button
+                onClick={() => setLocalFollowConfig(DEFAULT_CONFIG)}
+                type="button"
+                className={cn(
+                  "flex-1 py-2 text-xs font-semibold transition-all duration-300 relative flex items-center justify-center gap-2 z-10",
+                  localFollowConfig.continuous_mode
+                    ? "text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5 transition-transform duration-500", localFollowConfig.continuous_mode && "rotate-180")} />
+                continues
+              </button>
+
+              <button
+                onClick={() => setLocalFollowConfig(prev => ({ ...prev, continuous_mode: false }))}
+                type="button"
+                className={cn(
+                  "flex-1 py-2 text-xs font-semibold transition-all duration-300 relative flex items-center justify-center gap-2 z-10",
+                  !localFollowConfig.continuous_mode
+                    ? "text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                one-time
+              </button>
+            </div>
+
             <div className="space-y-4 p-3 rounded-lg bg-muted/30 border border-border">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Batch Size</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs">Batch Size</Label>
+                    <HelpTooltip text="The number of targets the phone will attempt to follow in a single session." />
+                  </div>
                   <Input
                     type="number"
                     value={localFollowConfig.batch_size}
@@ -451,8 +535,12 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                     className="h-8 text-sm"
                   />
                 </div>
+
                 <div className="space-y-1">
-                  <Label className="text-xs">Session Limit (2h)</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs">Session Limit (2h)</Label>
+                    <HelpTooltip text="A safety cap on the maximum actions allowed within any rolling 2-hour window." />
+                  </div>
                   <Input
                     type="number"
                     value={localFollowConfig.session_limit_2h}
@@ -464,7 +552,10 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">Min Batch Start</Label>
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs">Min Batch Start</Label>
+                    <HelpTooltip text="The minimum number of targets needed in your queue before the phone will start working." />
+                  </div>
                   <Input
                     type="number"
                     value={localFollowConfig.min_batch_start}
@@ -472,20 +563,29 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                     className="h-8 text-sm"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Cooldown (hours)</Label>
-                  <Input
-                    type="number"
-                    step="0.5"
-                    value={localFollowConfig.cooldown_hours}
-                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, cooldown_hours: Number(e.target.value) }))}
-                    className="h-8 text-sm"
-                  />
-                </div>
+
+                {localFollowConfig.continuous_mode && (
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <Label className="text-xs">Cooldown (hours)</Label>
+                      <HelpTooltip text="The mandatory rest period the account takes after successfully completing a session." />
+                    </div>
+                    <Input
+                      type="number"
+                      step="0.5"
+                      value={localFollowConfig.cooldown_hours}
+                      onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, cooldown_hours: Number(e.target.value) }))}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
-                <Label className="text-xs">Pattern Break</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs">Pattern Break</Label>
+                  <HelpTooltip text="Adds a longer behavioral pause every X follows to mimic natural human usage." />
+                </div>
                 <Input
                   type="number"
                   value={localFollowConfig.pattern_break}
@@ -495,7 +595,10 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs">Delay Range (seconds)</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label className="text-xs">Delay Range (seconds)</Label>
+                  <HelpTooltip text="Randomized wait time between individual follows to prevent detection." />
+                </div>
                 <div className="flex gap-2 items-center">
                   <Input
                     type="number"
@@ -514,7 +617,10 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
               </div>
 
               <div className="flex items-center justify-between">
-                <Label htmlFor="do-vetting" className="text-sm">Enable Vetting</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="do-vetting" className="text-sm">Enable Vetting</Label>
+                  <HelpTooltip text="Mimics real interest by browsing the target’s profile and liking recent posts before following." />
+                </div>
                 <Switch
                   id="do-vetting"
                   checked={localFollowConfig.do_vetting}

@@ -83,6 +83,7 @@ export interface SessionConfig {
     min_delay?: number;
     max_delay?: number;
     do_vetting?: boolean;
+    continuous_mode?: boolean;
 }
 
 // --- ERROR HANDLING ---
@@ -212,6 +213,7 @@ export const accountsApi = {
             handleApiError(error);
         }
     },
+    clearCooldown: (deviceId: string) => apiClient.patch(`/accounts/${deviceId}/clear_cooldown`),
 };
 
 // Target endpoints

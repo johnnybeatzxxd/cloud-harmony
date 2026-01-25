@@ -1,7 +1,8 @@
 import { Smartphone, Activity, UserPlus, AlertTriangle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { automationApi } from "@/lib/api";
+import { automationApi, targetsApi } from "@/lib/api";
+import { Target } from "lucide-react";
 
 interface StatItemProps {
   icon: React.ComponentType<{ className?: string }>;
@@ -42,11 +43,19 @@ function StatItem({ icon: Icon, label, value, change, changeType = "neutral", ic
 }
 
 export function StatsCards() {
-  const { data: statusData, isLoading } = useQuery({
+  const { data: statusData, isLoading: isStatusLoading } = useQuery({
     queryKey: ['automation-status'],
     queryFn: automationApi.getStatus,
     refetchInterval: 5000,
   });
+
+  const { data: targetStats, isLoading: isTargetsLoading } = useQuery({
+    queryKey: ['target-stats'],
+    queryFn: targetsApi.getStats,
+    refetchInterval: 5000,
+  });
+
+  const isLoading = isStatusLoading || isTargetsLoading;
 
   const accounts = statusData?.accounts || [];
 
@@ -100,11 +109,11 @@ export function StatsCards() {
         </div>
         <div className="px-6 last:pr-2 w-full">
           <StatItem
-            icon={AlertTriangle}
-            label="Warnings"
-            value={warnings}
-            change={warnings > 0 ? "Action needed" : "All good"}
-            changeType={warnings > 0 ? "negative" : "positive"}
+            icon={Target}
+            label="Pending Leads"
+            value={targetStats?.pending || 0}
+            change={targetStats?.pending && targetStats.pending > 0 ? "Queue active" : "Queue empty"}
+            changeType={targetStats?.pending && targetStats.pending > 0 ? "positive" : "neutral"}
             iconClassName="bg-warning/10 text-warning"
           />
         </div>

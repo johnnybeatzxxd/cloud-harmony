@@ -43,8 +43,8 @@ function mapAccountToDevice(account: AccountWithStats): Device {
     id: account.device_id,
     name: account.profile_name || `Device ${account.device_id}`,
     status: account.runtime_status, // Use raw runtime_status as requested
-    followCap: { current: 0, max: account.daily_limit },
-    isPlaying: account.is_enabled && account.runtime_status === "RUNNING", // Check specific running state
+    followCap: { current: account.stats.rolling_24h, max: account.daily_limit },
+    isPlaying: account.is_enabled,
     stats: account.stats || { recent_2h: 0, rolling_24h: 0 },
     streamUrl: account.stream_url || null
   };
@@ -199,6 +199,24 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
       toast({
         title: "Stop signal sent",
         description: "Automation stop signal sent to device.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const clearCooldownMutation = useMutation({
+    mutationFn: (deviceId: string) => accountsApi.clearCooldown(deviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['automation-status'] });
+      toast({
+        title: "Cooldown cleared",
+        description: "Cooldown has been cleared for the device.",
       });
     },
     onError: (error: Error) => {
@@ -415,9 +433,9 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
                     Open Stream
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem className="text-destructive focus:text-destructive">
+                  <DropdownMenuItem onClick={() => clearCooldownMutation.mutate(device.id)}>
                     <Trash2 className="w-4 h-4 mr-2" />
-                    Remove Device
+                    Clear Cooldown
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

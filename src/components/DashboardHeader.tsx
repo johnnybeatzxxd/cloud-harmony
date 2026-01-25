@@ -2,8 +2,12 @@ import { Search, Bell, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
+import { AddLeadsModal } from "./AddLeadsModal";
 
 export function DashboardHeader() {
+  const [isAddLeadsOpen, setIsAddLeadsOpen] = useState(false);
+
   return (
     <header className="flex items-center justify-between px-8 py-4 border-b border-border bg-card">
       <div>
@@ -31,11 +35,16 @@ export function DashboardHeader() {
           </Badge>
         </Button>
 
-        {/* Add Device */}
-        <Button className="gap-2">
+        {/* Add Leads */}
+        <Button className="gap-2" onClick={() => setIsAddLeadsOpen(true)}>
           <Plus className="w-4 h-4" />
           Add Leads
         </Button>
+
+        <AddLeadsModal
+          open={isAddLeadsOpen}
+          onOpenChange={setIsAddLeadsOpen}
+        />
       </div>
     </header>
   );

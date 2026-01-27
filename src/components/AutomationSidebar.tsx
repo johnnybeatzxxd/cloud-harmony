@@ -184,7 +184,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
     min_delay: 20,
     max_delay: 45,
     do_vetting: true,
-    continuous_mode: false
+    continuous_mode: false,
+    max_concurrent_sessions: 5
   });
 
   const DEFAULT_CONFIG = {
@@ -196,7 +197,8 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
     min_delay: 20,
     max_delay: 45,
     do_vetting: true,
-    continuous_mode: true
+    continuous_mode: true,
+    max_concurrent_sessions: 5
   };
 
   // Sync local state with API data when it loads
@@ -581,17 +583,33 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                 )}
               </div>
 
-              <div className="space-y-1">
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-xs">Pattern Break</Label>
-                  <HelpTooltip text="Adds a longer behavioral pause every X follows to mimic natural human usage." />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs">Pattern Break</Label>
+                    <HelpTooltip text="Adds a longer behavioral pause every X follows to mimic natural human usage." />
+                  </div>
+                  <Input
+                    type="number"
+                    value={localFollowConfig.pattern_break}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, pattern_break: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
                 </div>
-                <Input
-                  type="number"
-                  value={localFollowConfig.pattern_break}
-                  onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, pattern_break: Number(e.target.value) }))}
-                  className="h-8 text-sm"
-                />
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5">
+                    <Label className="text-xs">Max Parallel</Label>
+                    <HelpTooltip text="Maximum number of devices that can run automation sessions at the same time." />
+                  </div>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={localFollowConfig.max_concurrent_sessions}
+                    onChange={(e) => setLocalFollowConfig(prev => ({ ...prev, max_concurrent_sessions: Number(e.target.value) }))}
+                    className="h-8 text-sm"
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">

@@ -84,6 +84,7 @@ export interface SessionConfig {
     max_delay?: number;
     do_vetting?: boolean;
     continuous_mode?: boolean;
+    max_concurrent_sessions?: number;
 }
 
 // --- ERROR HANDLING ---

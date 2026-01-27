@@ -101,20 +101,48 @@ function AnimatedLog({ isActive, deviceId }: { isActive: boolean; deviceId: stri
 
 function StatusBadge({ status }: { status: string }) {
   // Determine style based on status content
+  const s = status ? status.toUpperCase() : "UNKNOWN";
+
   let className = "bg-muted/50 text-muted-foreground border-muted";
   let dotClass = "bg-muted-foreground";
 
-  const s = status ? status.toUpperCase() : "UNKNOWN";
-
-  if (s === "RUNNING") {
-    className = "bg-primary/10 text-primary border-primary/20";
-    dotClass = "bg-primary animate-pulse-glow";
-  } else if (s === "READY" || s === "ACTIVE") {
-    className = "bg-success/10 text-success border-success/20";
-    dotClass = "bg-success";
-  } else if (s === "PAUSED" || s === "COOLDOWN") {
-    className = "bg-warning/10 text-warning border-warning/20";
-    dotClass = "bg-warning";
+  switch (s) {
+    case "RUNNING":
+      className = "bg-violet-500/15 text-violet-400 border-violet-500/30";
+      dotClass = "bg-violet-400 animate-pulse";
+      break;
+    case "READY":
+    case "ACTIVE":
+      className = "bg-emerald-500/15 text-emerald-400 border-emerald-500/30";
+      dotClass = "bg-emerald-400";
+      break;
+    case "PAUSED":
+    case "COOLDOWN":
+      className = "bg-amber-500/15 text-amber-400 border-amber-500/30";
+      dotClass = "bg-amber-400";
+      break;
+    case "OFFLINE":
+    case "DISABLED":
+      className = "bg-rose-500/15 text-rose-400 border-rose-500/30";
+      dotClass = "bg-rose-400";
+      break;
+    case "ERROR":
+    case "FAILED":
+      className = "bg-red-500/15 text-red-400 border-red-500/30";
+      dotClass = "bg-red-400 animate-pulse";
+      break;
+    case "PENDING":
+    case "WAITING":
+      className = "bg-sky-500/15 text-sky-400 border-sky-500/30";
+      dotClass = "bg-sky-400";
+      break;
+    case "IDLE":
+      className = "bg-slate-500/15 text-slate-400 border-slate-500/30";
+      dotClass = "bg-slate-400";
+      break;
+    default:
+      className = "bg-zinc-500/15 text-zinc-400 border-zinc-500/30";
+      dotClass = "bg-zinc-400";
   }
 
   return (
@@ -395,10 +423,10 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
                   onClick={() => togglePlayPause(device.id)}
                   disabled={device.status.toUpperCase() === "OFFLINE"}
                   className={cn(
-                    "rounded-full transition-all",
+                    "rounded-full transition-all duration-200",
                     device.isPlaying
-                      ? "bg-primary/10 text-primary hover:bg-primary/20"
-                      : "hover:bg-muted"
+                      ? "bg-amber-500/20 text-amber-400 hover:bg-amber-500/30 hover:text-amber-300"
+                      : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 hover:text-emerald-300"
                   )}
                 >
                   {device.isPlaying ? (

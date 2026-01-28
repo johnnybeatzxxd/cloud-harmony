@@ -27,7 +27,13 @@ const Index = () => {
   );
 
   const startAutomationMutation = useMutation({
-    mutationFn: (deviceIds: string[]) => automationApi.start({ device_ids: deviceIds }),
+    mutationFn: (data: { deviceIds: string[]; mode: "follow" | "warmup"; warmupDay?: number }) => {
+      return automationApi.start({
+        device_ids: data.deviceIds,
+        mode: data.mode,
+        warmup_day: data.warmupDay,
+      });
+    },
     onSuccess: (data) => {
       toast.success(data?.message || "Automation started successfully");
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
@@ -50,12 +56,12 @@ const Index = () => {
     }
   });
 
-  const handleStartAutomation = () => {
+  const handleStartAutomation = (mode: "follow" | "warmup", warmupDay?: number) => {
     if (selectedDeviceIds.length === 0) {
       toast.error("Please select at least one device");
       return;
     }
-    startAutomationMutation.mutate(selectedDeviceIds);
+    startAutomationMutation.mutate({ deviceIds: selectedDeviceIds, mode, warmupDay });
   };
 
   const handleStopAll = () => {
@@ -90,7 +96,7 @@ const Index = () => {
                 </Button>
               ) : (
                 <Button
-                  onClick={handleStartAutomation}
+                  onClick={() => handleStartAutomation("follow")}
                   disabled={selectedDeviceIds.length === 0 || startAutomationMutation.isPending}
                   className="gap-2"
                 >

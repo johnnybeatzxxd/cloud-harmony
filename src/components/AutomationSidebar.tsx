@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { configApi, SessionConfig } from "@/lib/api";
+import { configApi, SessionConfig, WarmupStrategy, WarmupDayConfig } from "@/lib/api";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import {
@@ -77,14 +77,26 @@ function HelpTooltip({ text }: { text: string }) {
   );
 }
 
+// Local warmup config type (matches WarmupDayConfig from API)
+interface LocalWarmupDayConfig {
+  label: string;
+  feed: { enabled: boolean; minScrolls: number; maxScrolls: number };
+  reels: { enabled: boolean; minMinutes: number; maxMinutes: number };
+  limits: { maxLikes: number; maxFollows: number };
+  speed: "slow" | "normal" | "fast";
+  chance: { follow: number; like: number; comment: number };
+}
+
+type WarmupConfigs = Record<number, LocalWarmupDayConfig>;
+
 // Warmup configurations by day - now with state management
-const defaultWarmupConfigs = {
+const defaultWarmupConfigs: WarmupConfigs = {
   1: {
     label: "Day 1 - The Ghost",
     feed: { enabled: true, minScrolls: 13, maxScrolls: 20 },
     reels: { enabled: true, minMinutes: 3, maxMinutes: 6 },
     limits: { maxLikes: 3, maxFollows: 2 },
-    speed: "slow" as const,
+    speed: "slow",
     chance: { follow: 30, like: 20, comment: 20 }
   },
   2: {
@@ -92,7 +104,7 @@ const defaultWarmupConfigs = {
     feed: { enabled: true, minScrolls: 18, maxScrolls: 25 },
     reels: { enabled: true, minMinutes: 5, maxMinutes: 8 },
     limits: { maxLikes: 5, maxFollows: 3 },
-    speed: "slow" as const,
+    speed: "slow",
     chance: { follow: 20, like: 30, comment: 20 }
   },
   3: {
@@ -100,7 +112,7 @@ const defaultWarmupConfigs = {
     feed: { enabled: true, minScrolls: 25, maxScrolls: 30 },
     reels: { enabled: true, minMinutes: 5, maxMinutes: 10 },
     limits: { maxLikes: 10, maxFollows: 5 },
-    speed: "normal" as const,
+    speed: "normal",
     chance: { follow: 20, like: 30, comment: 30 }
   },
   4: {
@@ -108,7 +120,7 @@ const defaultWarmupConfigs = {
     feed: { enabled: true, minScrolls: 45, maxScrolls: 50 },
     reels: { enabled: true, minMinutes: 10, maxMinutes: 15 },
     limits: { maxLikes: 15, maxFollows: 8 },
-    speed: "normal" as const,
+    speed: "normal",
     chance: { follow: 20, like: 30, comment: 30 }
   },
   5: {
@@ -116,7 +128,7 @@ const defaultWarmupConfigs = {
     feed: { enabled: true, minScrolls: 45, maxScrolls: 55 },
     reels: { enabled: true, minMinutes: 15, maxMinutes: 20 },
     limits: { maxLikes: 30, maxFollows: 8 },
-    speed: "normal" as const,
+    speed: "normal",
     chance: { follow: 20, like: 25, comment: 30 }
   },
   6: {
@@ -124,7 +136,7 @@ const defaultWarmupConfigs = {
     feed: { enabled: true, minScrolls: 50, maxScrolls: 60 },
     reels: { enabled: true, minMinutes: 15, maxMinutes: 26 },
     limits: { maxLikes: 30, maxFollows: 10 },
-    speed: "fast" as const,
+    speed: "fast",
     chance: { follow: 20, like: 35, comment: 30 }
   },
   7: {
@@ -132,17 +144,15 @@ const defaultWarmupConfigs = {
     feed: { enabled: true, minScrolls: 55, maxScrolls: 65 },
     reels: { enabled: true, minMinutes: 15, maxMinutes: 25 },
     limits: { maxLikes: 30, maxFollows: 12 },
-    speed: "fast" as const,
+    speed: "fast",
     chance: { follow: 40, like: 40, comment: 35 }
   }
 };
 
-type DayKey = keyof typeof defaultWarmupConfigs;
-type SpeedType = "slow" | "normal" | "fast";
-type WarmupConfig = typeof defaultWarmupConfigs[DayKey];
+type DayKey = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface AutomationSidebarProps {
-  onStartAutomation?: () => void;
+  onStartAutomation?: (mode: "follow" | "warmup", warmupDay?: number) => void;
   selectedDeviceCount?: number;
 }
 
@@ -161,6 +171,31 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
     queryFn: configApi.get,
     refetchOnWindowFocus: false,
   });
+
+  // Sync warmup configs from API when data loads
+  useEffect(() => {
+    if (sessionConfig?.warmup_strategy) {
+      const apiWarmup = sessionConfig.warmup_strategy;
+      setWarmupConfigs(prev => {
+        const merged = { ...prev };
+        for (const [day, config] of Object.entries(apiWarmup)) {
+          const dayNum = Number(day);
+          if (dayNum >= 1 && dayNum <= 7) {
+            const key = dayNum as DayKey;
+            merged[key] = {
+              label: config.label || prev[key].label,
+              feed: { ...prev[key].feed, ...config.feed },
+              reels: { ...prev[key].reels, ...config.reels },
+              limits: { ...prev[key].limits, ...config.limits },
+              speed: config.speed || prev[key].speed,
+              chance: { ...prev[key].chance, ...config.chance },
+            };
+          }
+        }
+        return merged;
+      });
+    }
+  }, [sessionConfig]);
 
   // Update session config mutation
   const updateConfigMutation = useMutation({
@@ -218,16 +253,18 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
   };
 
   const saveConfig = () => {
-    const payload = { ...localFollowConfig };
+    const payload: SessionConfig = { ...localFollowConfig };
     if (!payload.continuous_mode) {
       payload.cooldown_hours = 0.0;
     }
+    // Include warmup_strategy in the save payload
+    payload.warmup_strategy = warmupConfigs as WarmupStrategy;
     updateConfigMutation.mutate(payload);
   };
 
   const currentWarmup = warmupConfigs[selectedDay];
 
-  const updateWarmupConfig = (updates: Partial<WarmupConfig>) => {
+  const updateWarmupConfig = (updates: Partial<LocalWarmupDayConfig>) => {
     setWarmupConfigs(prev => ({
       ...prev,
       [selectedDay]: { ...prev[selectedDay], ...updates }
@@ -314,7 +351,7 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                 <Label className="text-xs text-muted-foreground">Speed</Label>
                 <Select
                   value={currentWarmup.speed}
-                  onValueChange={(val: SpeedType) => updateWarmupConfig({ speed: val })}
+                  onValueChange={(val: LocalWarmupDayConfig['speed']) => updateWarmupConfig({ speed: val })}
                 >
                   <SelectTrigger className="w-full h-8">
                     <SelectValue />
@@ -477,6 +514,21 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Save & Start Buttons for Warmup */}
+            <div className="space-y-2 mt-4">
+              <Button
+                onClick={saveConfig}
+                disabled={updateConfigMutation.isPending || isConfigLoading}
+                className="w-full"
+                variant="secondary"
+              >
+                {updateConfigMutation.isPending ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : null}
+                Save Configuration
+              </Button>
             </div>
           </div>
         ) : (
@@ -662,19 +714,19 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
         )}
       </ScrollArea>
 
-      {/* Start Button - Only for Follow Automation */}
-      {activeMode === "follow" && (
-        <div className="p-4 border-t border-border">
-          <Button
-            onClick={onStartAutomation}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
-            size="lg"
-          >
-            <Play className="w-5 h-5" />
-            Start Selected ({selectedDeviceCount})
-          </Button>
-        </div>
-      )}
+      {/* Start Button */}
+      <div className="p-4 border-t border-border">
+        <Button
+          onClick={() => onStartAutomation?.(activeMode, activeMode === "warmup" ? selectedDay : undefined)}
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+          size="lg"
+        >
+          <Play className="w-5 h-5" />
+          {activeMode === "warmup"
+            ? `Start Warmup Day ${selectedDay} (${selectedDeviceCount})`
+            : `Start Follow (${selectedDeviceCount})`}
+        </Button>
+      </div>
 
       {/* Footer */}
       <div className="p-4 border-t border-border space-y-4">

@@ -40,8 +40,26 @@ export interface AutomationStatus {
     accounts?: AccountWithStats[];
 }
 
+// Warmup strategy types
+export interface WarmupDayConfig {
+    label: string;
+    feed: { enabled: boolean; minScrolls: number; maxScrolls: number };
+    reels: { enabled: boolean; minMinutes: number; maxMinutes: number };
+    limits: { maxLikes: number; maxFollows: number };
+    speed: "slow" | "normal" | "fast";
+    chance: { follow: number; like: number; comment: number };
+}
+
+export type WarmupStrategy = Record<string, WarmupDayConfig>;
+
 export interface DeviceSelection {
     device_ids?: string[];
+}
+
+export interface StartAutomationPayload {
+    device_ids: string[];
+    mode?: "follow" | "warmup";
+    warmup_day?: number;
 }
 
 export interface Target {
@@ -85,6 +103,7 @@ export interface SessionConfig {
     do_vetting?: boolean;
     continuous_mode?: boolean;
     max_concurrent_sessions?: number;
+    warmup_strategy?: WarmupStrategy;
 }
 
 // --- ERROR HANDLING ---
@@ -158,9 +177,9 @@ export const automationApi = {
         }
     },
 
-    start: async (selection: DeviceSelection = {}): Promise<AutomationStatus> => {
+    start: async (payload: StartAutomationPayload): Promise<AutomationStatus> => {
         try {
-            const response = await apiClient.post<AutomationStatus>('/automation/start', selection);
+            const response = await apiClient.post<AutomationStatus>('/automation/start', payload);
             return response.data;
         } catch (error) {
             handleApiError(error);

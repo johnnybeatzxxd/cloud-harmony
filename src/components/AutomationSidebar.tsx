@@ -154,13 +154,29 @@ type DayKey = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 interface AutomationSidebarProps {
   onStartAutomation?: (mode: "follow" | "warmup", warmupDay?: number) => void;
   selectedDeviceCount?: number;
+  onModeChange?: (mode: "follow" | "warmup") => void;
+  onWarmupDayChange?: (day: number) => void;
 }
 
-export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }: AutomationSidebarProps) {
+export function AutomationSidebar({
+  onStartAutomation,
+  selectedDeviceCount = 0,
+  onModeChange,
+  onWarmupDayChange
+}: AutomationSidebarProps) {
   const [activeMode, setActiveMode] = useState<"warmup" | "follow">("warmup");
   const [selectedDay, setSelectedDay] = useState<DayKey>(1);
   const [warmupConfigs, setWarmupConfigs] = useState(defaultWarmupConfigs);
   const { theme, setTheme } = useTheme();
+
+  // Notify parent of initial state and changes
+  useEffect(() => {
+    onModeChange?.(activeMode);
+  }, [activeMode, onModeChange]);
+
+  useEffect(() => {
+    onWarmupDayChange?.(selectedDay);
+  }, [selectedDay, onWarmupDayChange]);
 
   // Follow config state
   const queryClient = useQueryClient();
@@ -722,9 +738,7 @@ export function AutomationSidebar({ onStartAutomation, selectedDeviceCount = 0 }
           size="lg"
         >
           <Play className="w-5 h-5" />
-          {activeMode === "warmup"
-            ? `Start Warmup Day ${selectedDay} (${selectedDeviceCount})`
-            : `Start Follow (${selectedDeviceCount})`}
+          Start Selected ({selectedDeviceCount})
         </Button>
       </div>
 

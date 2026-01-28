@@ -12,6 +12,8 @@ import { Loader2, StopCircle } from "lucide-react";
 
 const Index = () => {
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
+  const [currentMode, setCurrentMode] = useState<"follow" | "warmup">("warmup");
+  const [currentWarmupDay, setCurrentWarmupDay] = useState<number>(1);
 
   const queryClient = useQueryClient();
 
@@ -73,6 +75,8 @@ const Index = () => {
       <AutomationSidebar
         onStartAutomation={handleStartAutomation}
         selectedDeviceCount={selectedDeviceIds.length}
+        onModeChange={setCurrentMode}
+        onWarmupDayChange={setCurrentWarmupDay}
       />
       <div className="flex-1 flex flex-col">
         <DashboardHeader />
@@ -96,7 +100,7 @@ const Index = () => {
                 </Button>
               ) : (
                 <Button
-                  onClick={() => handleStartAutomation("follow")}
+                  onClick={() => handleStartAutomation(currentMode, currentMode === "warmup" ? currentWarmupDay : undefined)}
                   disabled={selectedDeviceIds.length === 0 || startAutomationMutation.isPending}
                   className="gap-2"
                 >

@@ -12,6 +12,33 @@ const apiClient = axios.create({
     },
 });
 
+// Request interceptor to add the activation key
+apiClient.interceptors.request.use((config) => {
+    const token = localStorage.getItem('activation_key');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+});
+
+// Response interceptor to handle authentication errors
+apiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+            const detail = error.response.data?.detail;
+
+            if (detail === "Token has expired") {
+                window.dispatchEvent(new Event('activation-key-expired'));
+            } else if (detail === "Invalid token" || detail === "Not authenticated") {
+                localStorage.removeItem('activation_key');
+                window.dispatchEvent(new Event('activation-key-invalid'));
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 // --- TYPE DEFINITIONS (matching backend schemas) ---
 
 export interface Account {

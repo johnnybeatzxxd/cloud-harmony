@@ -1,12 +1,51 @@
-import { Search, Bell, Plus } from "lucide-react";
+import { Search, Key, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AddLeadsModal } from "./AddLeadsModal";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { toast } from "sonner";
 
 export function DashboardHeader() {
   const [isAddLeadsOpen, setIsAddLeadsOpen] = useState(false);
+  const [activationKey, setActivationKey] = useState(() => localStorage.getItem("activation_key") || "");
+  const [isExpired, setIsExpired] = useState(false);
+
+  useEffect(() => {
+    const handleExpired = () => {
+      setIsExpired(true);
+      toast.error("Activation key has expired. Please update it.");
+    };
+
+    const handleInvalid = () => {
+      setActivationKey("");
+      setIsExpired(false);
+      localStorage.removeItem("activation_key");
+      toast.error("Invalid activation key. Please enter a valid one.");
+    };
+
+    window.addEventListener('activation-key-expired', handleExpired);
+    window.addEventListener('activation-key-invalid', handleInvalid);
+
+    return () => {
+      window.removeEventListener('activation-key-expired', handleExpired);
+      window.removeEventListener('activation-key-invalid', handleInvalid);
+    };
+  }, []);
+
+  const handleSaveKey = () => {
+    if (!activationKey.trim()) {
+      toast.error("Please enter a valid activation key");
+      return;
+    }
+    localStorage.setItem("activation_key", activationKey);
+    setIsExpired(false);
+    toast.success("Activation key saved successfully");
+  };
 
   return (
     <header className="flex items-center justify-between px-8 py-4 border-b border-border bg-card">
@@ -27,13 +66,42 @@ export function DashboardHeader() {
           />
         </div>
 
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="w-5 h-5" />
-          <Badge className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-xs bg-destructive text-destructive-foreground">
-            3
-          </Badge>
-        </Button>
+        {/* Settings & Activation Key */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative">
+              <Key className={`w-5 h-5 ${isExpired ? "text-yellow-500" : ""}`} />
+              {!activationKey ? (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              ) : isExpired ? (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <h4 className="font-medium leading-none">
+                  {isExpired ? "Activation Expired" : "Activation Key"}
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {isExpired
+                    ? "Your session has expired. Please update your key."
+                    : "Enter your activation key to access features"}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Input
+                  value={activationKey}
+                  onChange={(e) => setActivationKey(e.target.value)}
+                  placeholder="Enter activation key"
+                  type="password"
+                />
+                <Button onClick={handleSaveKey}>Save Key</Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {/* Add Leads */}
         <Button className="gap-2" onClick={() => setIsAddLeadsOpen(true)}>

@@ -180,9 +180,16 @@ function TaskModeBadge({ mode, day }: { mode?: string; day?: number }) {
 interface DeviceTableProps {
   onSelectionChange?: (selectedIds: string[]) => void;
   searchQuery?: string;
+  globalMode: "follow" | "warmup";
+  globalWarmupDay?: number;
 }
 
-export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTableProps) {
+export function DeviceTable({
+  onSelectionChange,
+  searchQuery = "",
+  globalMode,
+  globalWarmupDay
+}: DeviceTableProps) {
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -230,7 +237,12 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
 
   // Mutation for starting automation on a device
   const startMutation = useMutation({
-    mutationFn: (deviceId: string) => automationApi.start({ device_ids: [deviceId] }),
+    mutationFn: (payload: { deviceId: string; mode?: "follow" | "warmup"; warmup_day?: number }) =>
+      automationApi.start({
+        device_ids: [payload.deviceId],
+        mode: payload.mode,
+        warmup_day: payload.warmup_day
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['automation-status'] });
       toast({
@@ -296,7 +308,12 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
     if (device.isPlaying) {
       stopMutation.mutate(id);
     } else {
-      startMutation.mutate(id);
+      // Use global mode settings
+      startMutation.mutate({
+        deviceId: id,
+        mode: globalMode,
+        warmup_day: globalMode === "warmup" ? globalWarmupDay : undefined
+      });
     }
   };
 

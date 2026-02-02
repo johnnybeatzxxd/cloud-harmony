@@ -117,6 +117,8 @@ const Index = () => {
             <DeviceTable
               onSelectionChange={setSelectedDeviceIds}
               searchQuery={searchQuery}
+              globalMode={currentMode}
+              globalWarmupDay={currentWarmupDay}
             />
           </div>
         </main>

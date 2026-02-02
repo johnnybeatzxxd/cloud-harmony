@@ -30,6 +30,7 @@ interface Device {
   status: string; // Raw runtime_status
   taskMode?: string;
   warmupDay?: number;
+  groupName?: string | null;
   isPlaying: boolean;
   stats: {
     recent_2h: number;
@@ -46,6 +47,7 @@ function mapAccountToDevice(account: AccountWithStats): Device {
     status: account.runtime_status, // Use raw runtime_status as requested
     taskMode: account.task_mode,
     warmupDay: account.warmup_day,
+    groupName: account.group_name,
     isPlaying: account.is_enabled,
     stats: account.stats || { recent_2h: 0, rolling_24h: 0 },
     streamUrl: account.stream_url || null
@@ -182,13 +184,15 @@ interface DeviceTableProps {
   searchQuery?: string;
   globalMode: "follow" | "warmup";
   globalWarmupDay?: number;
+  selectedGroup: string;
 }
 
 export function DeviceTable({
   onSelectionChange,
   searchQuery = "",
   globalMode,
-  globalWarmupDay
+  globalWarmupDay,
+  selectedGroup
 }: DeviceTableProps) {
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -207,6 +211,15 @@ export function DeviceTable({
   const devices = (statusData?.accounts || [])
     .map(mapAccountToDevice)
     .filter(device => {
+      // Group filter
+      if (selectedGroup !== "all") {
+        if (selectedGroup === "unassigned") {
+          if (device.groupName) return false;
+        } else {
+          if (device.groupName !== selectedGroup) return false;
+        }
+      }
+
       if (!searchQuery) return true;
       const query = searchQuery.toLowerCase();
       return (

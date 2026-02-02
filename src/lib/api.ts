@@ -52,6 +52,7 @@ export interface Account {
     stream_url?: string | null;
     task_mode?: string;
     warmup_day?: number;
+    group_name?: string | null;
 }
 
 export interface AccountStats {

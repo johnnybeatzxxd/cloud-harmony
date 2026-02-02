@@ -208,6 +208,26 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
         device.name.toLowerCase().includes(query) ||
         device.id.toLowerCase().includes(query)
       );
+    })
+    .sort((a, b) => {
+      if (!searchQuery) return 0;
+      const query = searchQuery.toLowerCase();
+
+      const aNameStarts = a.name.toLowerCase().startsWith(query);
+      const bNameStarts = b.name.toLowerCase().startsWith(query);
+
+      // Priority 1: Name starts with query
+      if (aNameStarts && !bNameStarts) return -1;
+      if (!aNameStarts && bNameStarts) return 1;
+
+      const aIdStarts = a.id.toLowerCase().startsWith(query);
+      const bIdStarts = b.id.toLowerCase().startsWith(query);
+
+      // Priority 2: ID starts with query
+      if (aIdStarts && !bIdStarts) return -1;
+      if (!aIdStarts && bIdStarts) return 1;
+
+      return 0;
     });
 
   // Mutation for starting automation on a device

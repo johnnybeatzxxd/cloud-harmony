@@ -14,6 +14,7 @@ const Index = () => {
   const [selectedDeviceIds, setSelectedDeviceIds] = useState<string[]>([]);
   const [currentMode, setCurrentMode] = useState<"follow" | "warmup">("warmup");
   const [currentWarmupDay, setCurrentWarmupDay] = useState<number>(1);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const queryClient = useQueryClient();
 
@@ -79,7 +80,7 @@ const Index = () => {
         onWarmupDayChange={setCurrentWarmupDay}
       />
       <div className="flex-1 flex flex-col">
-        <DashboardHeader />
+        <DashboardHeader onSearch={setSearchQuery} />
         <main className="flex-1 p-8 space-y-6 overflow-auto">
           <StatsCards />
           <div>
@@ -113,7 +114,10 @@ const Index = () => {
                 </Button>
               )}
             </div>
-            <DeviceTable onSelectionChange={setSelectedDeviceIds} />
+            <DeviceTable
+              onSelectionChange={setSelectedDeviceIds}
+              searchQuery={searchQuery}
+            />
           </div>
         </main>
       </div>

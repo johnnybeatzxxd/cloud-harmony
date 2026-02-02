@@ -181,9 +181,10 @@ function FollowCapProgress({ current, max }: { current: number; max: number }) {
 
 interface DeviceTableProps {
   onSelectionChange?: (selectedIds: string[]) => void;
+  searchQuery?: string;
 }
 
-export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
+export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTableProps) {
   const [selectedDevices, setSelectedDevices] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
@@ -198,7 +199,16 @@ export function DeviceTable({ onSelectionChange }: DeviceTableProps) {
     refetchIntervalInBackground: true,
   });
 
-  const devices = (statusData?.accounts || []).map(mapAccountToDevice);
+  const devices = (statusData?.accounts || [])
+    .map(mapAccountToDevice)
+    .filter(device => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        device.name.toLowerCase().includes(query) ||
+        device.id.toLowerCase().includes(query)
+      );
+    });
 
   // Mutation for starting automation on a device
   const startMutation = useMutation({

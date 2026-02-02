@@ -50,6 +50,8 @@ export interface Account {
     daily_limit: number;
     cooldown_until: string | null;
     stream_url?: string | null;
+    task_mode?: string;
+    warmup_day?: number;
 }
 
 export interface AccountStats {

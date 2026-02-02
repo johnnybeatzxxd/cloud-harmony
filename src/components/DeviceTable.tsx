@@ -28,7 +28,8 @@ interface Device {
   id: string;
   name: string;
   status: string; // Raw runtime_status
-  followCap: { current: number; max: number };
+  taskMode?: string;
+  warmupDay?: number;
   isPlaying: boolean;
   stats: {
     recent_2h: number;
@@ -43,7 +44,8 @@ function mapAccountToDevice(account: AccountWithStats): Device {
     id: account.device_id,
     name: account.profile_name || `Device ${account.device_id}`,
     status: account.runtime_status, // Use raw runtime_status as requested
-    followCap: { current: account.stats.rolling_24h, max: account.daily_limit },
+    taskMode: account.task_mode,
+    warmupDay: account.warmup_day,
     isPlaying: account.is_enabled,
     stats: account.stats || { recent_2h: 0, rolling_24h: 0 },
     streamUrl: account.stream_url || null
@@ -153,28 +155,24 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function FollowCapProgress({ current, max }: { current: number; max: number }) {
-  const percentage = (current / max) * 100;
-  const isNearLimit = percentage >= 90;
-  const isComplete = percentage >= 100;
+function TaskModeBadge({ mode, day }: { mode?: string; day?: number }) {
+  if (!mode) return <span className="text-muted-foreground text-sm">-</span>;
+
+  // Normalize mode string
+  const modeStr = mode.toLowerCase();
+  const isWarmup = modeStr.includes('warmup');
+
+  let textColor = "text-indigo-400/80";
+  let content = "Follow";
+
+  if (isWarmup) {
+    textColor = "text-orange-400/80";
+    content = `Warmup ${day || '?'}`;
+  }
 
   return (
-    <div className="flex items-center gap-3 min-w-[140px]">
-      <div className="flex-1 h-2 bg-muted/30 rounded-full overflow-hidden">
-        <div
-          className={cn(
-            "h-full rounded-full transition-all duration-500",
-            isComplete ? "bg-destructive" : isNearLimit ? "bg-warning" : "bg-primary"
-          )}
-          style={{ width: `${Math.min(percentage, 100)}%` }}
-        />
-      </div>
-      <span className={cn(
-        "text-sm font-medium tabular-nums min-w-[60px]",
-        isComplete ? "text-destructive" : isNearLimit ? "text-warning" : "text-foreground"
-      )}>
-        {current}/{max}
-      </span>
+    <div className={cn("flex items-center gap-2 font-medium text-[12px] uppercase tracking-wider", textColor)}>
+      {content}
     </div>
   );
 }
@@ -370,7 +368,7 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="grid grid-cols-[40px,250px,110px,80px,80px,140px,1fr,60px,40px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
+      <div className="grid grid-cols-[40px,250px,110px,80px,80px,110px,1fr,60px,40px] gap-4 px-6 py-4 bg-muted/30 border-b border-border">
         <div className="flex items-center justify-center">
           <Checkbox
             checked={isAllSelected}
@@ -387,7 +385,7 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
         <div className="text-sm font-semibold text-foreground">Status</div>
         <div className="text-sm font-semibold text-foreground">2h</div>
         <div className="text-sm font-semibold text-foreground">24h</div>
-        <div className="text-sm font-semibold text-foreground">Follow Cap</div>
+        <div className="text-sm font-semibold text-foreground">Task</div>
         <div className="text-sm font-semibold text-foreground">Logs</div>
         <div className="text-sm font-semibold text-foreground text-center">Control</div>
         <div></div>
@@ -400,7 +398,7 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
             <div
               key={device.id}
               className={cn(
-                "grid grid-cols-[40px,250px,110px,80px,80px,140px,1fr,60px,40px] gap-4 px-6 py-4 items-center transition-colors",
+                "grid grid-cols-[40px,250px,110px,80px,80px,110px,1fr,60px,40px] gap-4 px-6 py-4 items-center transition-colors",
                 selectedDevices.has(device.id) ? "bg-primary/5" : "hover:bg-muted/10"
               )}
               style={{ animationDelay: `${index * 50}ms` }}
@@ -439,8 +437,8 @@ export function DeviceTable({ onSelectionChange, searchQuery = "" }: DeviceTable
                 {device.stats.rolling_24h}
               </div>
 
-              {/* Follow Cap */}
-              <FollowCapProgress current={device.followCap.current} max={device.followCap.max} />
+              {/* Task Mode */}
+              <TaskModeBadge mode={device.taskMode} day={device.warmupDay} />
 
               {/* Logs */}
               <AnimatedLog isActive={device.isPlaying} deviceId={device.id} />

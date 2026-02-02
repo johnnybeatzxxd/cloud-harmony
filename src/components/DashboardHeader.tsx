@@ -38,11 +38,21 @@ export function DashboardHeader() {
   }, []);
 
   const handleSaveKey = () => {
-    if (!activationKey.trim()) {
+    const trimmedKey = activationKey.trim();
+
+    if (!trimmedKey) {
       toast.error("Please enter a valid activation key");
       return;
     }
-    localStorage.setItem("activation_key", activationKey);
+
+    // Check for non-ASCII characters which cause header errors (e.g. "String contains non ISO-8859-1 code point")
+    if (!/^[\x00-\x7F]*$/.test(trimmedKey)) {
+      toast.error("Activation key contains invalid characters. Please remove any emojis or special symbols.");
+      return;
+    }
+
+    setActivationKey(trimmedKey); // Update state to trimmed version
+    localStorage.setItem("activation_key", trimmedKey);
     setIsExpired(false);
     toast.success("Activation key saved successfully");
   };

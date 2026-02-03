@@ -7,8 +7,8 @@ import { StatsCards } from "@/components/StatsCards";
 import { DeviceTable } from "@/components/DeviceTable";
 import { toast } from "sonner";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
-import { automationApi } from "@/lib/api";
-import { Loader2, StopCircle, Layers } from "lucide-react";
+import { automationApi, systemApi } from "@/lib/api";
+import { Loader2, StopCircle, Layers, RefreshCw } from "lucide-react";
 import { useMemo } from "react";
 import {
   Select,
@@ -26,6 +26,7 @@ const Index = () => {
   const [currentWarmupDay, setCurrentWarmupDay] = useState<number>(1);
   const [selectedGroupId, setSelectedGroupId] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const queryClient = useQueryClient();
 
@@ -109,6 +110,22 @@ const Index = () => {
     stopAllMutation.mutate();
   };
 
+  const handleSync = async () => {
+    setIsSyncing(true);
+    toast.info("Syncing devices...");
+
+    try {
+      await systemApi.syncDevices();
+      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['automation-status'] });
+      toast.success("Devices synced successfully");
+    } catch (error) {
+      toast.error("Failed to sync devices");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   return (
     <div className="flex min-h-screen w-full bg-background">
       <AutomationSidebar
@@ -144,6 +161,16 @@ const Index = () => {
                     </SelectContent>
                   </Select>
                 </div>
+
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                  onClick={handleSync}
+                  disabled={isSyncing}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin" : ""}`} />
+                </Button>
               </div>
               {hasRunningAutomations ? (
                 <Button

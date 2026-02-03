@@ -367,4 +367,16 @@ export const configApi = {
     },
 };
 
+// System endpoints
+export const systemApi = {
+    syncDevices: async (): Promise<{ message: string }> => {
+        try {
+            const response = await apiClient.post<{ message: string }>('/system/sync_devices');
+            return response.data;
+        } catch (error) {
+            handleApiError(error);
+        }
+    },
+};
+
 export default apiClient;

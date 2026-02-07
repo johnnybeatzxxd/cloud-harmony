@@ -77,7 +77,7 @@ export interface WarmupDayConfig {
     reels: { enabled: boolean; minMinutes: number; maxMinutes: number };
     limits: { maxLikes: number; maxFollows: number };
     speed: "slow" | "normal" | "fast";
-    chance: { follow: number; like: number; comment: number };
+    chance: { follow: number; like: number; comment: number; share: number };
 }
 
 export type WarmupStrategy = Record<string, WarmupDayConfig>;
@@ -133,6 +133,7 @@ export interface SessionConfig {
     do_vetting?: boolean;
     continuous_mode?: boolean;
     max_concurrent_sessions?: number;
+    share_targets?: string[];
     warmup_strategy?: WarmupStrategy;
 }
 

@@ -8,7 +8,8 @@ import {
   Moon,
   RefreshCw,
   Clock,
-  Info
+  Info,
+  X
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { Switch } from "@/components/ui/switch";
@@ -84,7 +85,7 @@ interface LocalWarmupDayConfig {
   reels: { enabled: boolean; minMinutes: number; maxMinutes: number };
   limits: { maxLikes: number; maxFollows: number };
   speed: "slow" | "normal" | "fast";
-  chance: { follow: number; like: number; comment: number };
+  chance: { follow: number; like: number; comment: number; share: number };
 }
 
 type WarmupConfigs = Record<number, LocalWarmupDayConfig>;
@@ -97,7 +98,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 3, maxMinutes: 6 },
     limits: { maxLikes: 3, maxFollows: 2 },
     speed: "slow",
-    chance: { follow: 30, like: 20, comment: 20 }
+    chance: { follow: 30, like: 20, comment: 20, share: 0 }
   },
   2: {
     label: "Day 2 - The Observer",
@@ -105,7 +106,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 5, maxMinutes: 8 },
     limits: { maxLikes: 5, maxFollows: 3 },
     speed: "slow",
-    chance: { follow: 20, like: 30, comment: 20 }
+    chance: { follow: 20, like: 30, comment: 20, share: 0 }
   },
   3: {
     label: "Day 3 - Waking Up",
@@ -113,7 +114,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 5, maxMinutes: 10 },
     limits: { maxLikes: 10, maxFollows: 5 },
     speed: "normal",
-    chance: { follow: 20, like: 30, comment: 30 }
+    chance: { follow: 20, like: 30, comment: 30, share: 0 }
   },
   4: {
     label: "Day 4 - Casual User",
@@ -121,7 +122,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 10, maxMinutes: 15 },
     limits: { maxLikes: 15, maxFollows: 8 },
     speed: "normal",
-    chance: { follow: 20, like: 30, comment: 30 }
+    chance: { follow: 20, like: 30, comment: 30, share: 5 }
   },
   5: {
     label: "Day 5 - Active User",
@@ -129,7 +130,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 15, maxMinutes: 20 },
     limits: { maxLikes: 30, maxFollows: 8 },
     speed: "normal",
-    chance: { follow: 20, like: 25, comment: 30 }
+    chance: { follow: 20, like: 25, comment: 30, share: 5 }
   },
   6: {
     label: "Day 6 - The Addict",
@@ -137,7 +138,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 15, maxMinutes: 26 },
     limits: { maxLikes: 30, maxFollows: 10 },
     speed: "fast",
-    chance: { follow: 20, like: 35, comment: 30 }
+    chance: { follow: 20, like: 35, comment: 30, share: 10 }
   },
   7: {
     label: "Day 7 - Full Power",
@@ -145,7 +146,7 @@ const defaultWarmupConfigs: WarmupConfigs = {
     reels: { enabled: true, minMinutes: 15, maxMinutes: 25 },
     limits: { maxLikes: 30, maxFollows: 12 },
     speed: "fast",
-    chance: { follow: 40, like: 40, comment: 35 }
+    chance: { follow: 40, like: 40, comment: 35, share: 15 }
   }
 };
 
@@ -156,6 +157,74 @@ interface AutomationSidebarProps {
   selectedDeviceCount?: number;
   onModeChange?: (mode: "follow" | "warmup") => void;
   onWarmupDayChange?: (day: number) => void;
+}
+
+function ShareTargetsInput({
+  value = [],
+  onChange
+}: {
+  value?: string[];
+  onChange: (value: string[]) => void;
+}) {
+  const [inputValue, setInputValue] = useState("");
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ' ') {
+      e.preventDefault();
+      addTarget();
+    }
+  };
+
+  const addTarget = () => {
+    const trimmed = inputValue.trim().replace(/^@/, '');
+    if (!trimmed) return;
+
+    if (value.length >= 2) {
+      toast.error("Maximum 2 share targets allowed");
+      return;
+    }
+
+    if (value.includes(trimmed)) {
+      setInputValue("");
+      return;
+    }
+
+    onChange([...value, trimmed]);
+    setInputValue("");
+  };
+
+  const removeTarget = (target: string) => {
+    onChange(value.filter(t => t !== target));
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <Label className="text-sm">Share Targets</Label>
+        <span className="text-[10px] text-muted-foreground">(Max 2)</span>
+      </div>
+      <div className="flex flex-wrap gap-2 p-2 bg-muted/30 rounded-md border border-border min-h-[42px] focus-within:ring-1 focus-within:ring-ring">
+        {value.map(target => (
+          <div key={target} className="bg-primary/20 text-primary text-xs px-2 py-1 rounded-md flex items-center gap-1">
+            <span className="font-medium">@{target}</span>
+            <button onClick={() => removeTarget(target)} className="hover:text-destructive transition-colors">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+        {value.length < 2 && (
+          <input
+            className="bg-transparent border-none outline-none text-sm flex-1 min-w-[80px] placeholder:text-muted-foreground/70"
+            placeholder={value.length === 0 ? "Type @username..." : ""}
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={addTarget}
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function AutomationSidebar({
@@ -236,7 +305,8 @@ export function AutomationSidebar({
     max_delay: 45,
     do_vetting: true,
     continuous_mode: false,
-    max_concurrent_sessions: 5
+    max_concurrent_sessions: 5,
+    share_targets: []
   });
 
   const DEFAULT_CONFIG = {
@@ -249,7 +319,8 @@ export function AutomationSidebar({
     max_delay: 45,
     do_vetting: true,
     continuous_mode: true,
-    max_concurrent_sessions: 5
+    max_concurrent_sessions: 5,
+    share_targets: []
   };
 
   // Sync local state with API data when it loads
@@ -339,6 +410,8 @@ export function AutomationSidebar({
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
               Warmup Configuration
             </p>
+
+
 
             {/* Day Selector */}
             <div className="space-y-2">
@@ -494,7 +567,7 @@ export function AutomationSidebar({
               {/* Chances */}
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Chances (%)</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <div className="space-y-1">
                     <span className="text-xs text-muted-foreground">Follow</span>
                     <Input
@@ -528,8 +601,27 @@ export function AutomationSidebar({
                       className="h-8 text-sm"
                     />
                   </div>
+                  <div className="space-y-1">
+                    <span className="text-xs text-muted-foreground">Share</span>
+                    <Input
+                      type="number"
+                      value={currentWarmup.chance.share}
+                      onChange={(e) => updateWarmupConfig({
+                        chance: { ...currentWarmup.chance, share: Number(e.target.value) }
+                      })}
+                      className="h-8 text-sm"
+                    />
+                  </div>
                 </div>
               </div>
+            </div>
+
+            {/* Share Targets Config */}
+            <div className="p-3 rounded-lg bg-muted/30 border border-border">
+              <ShareTargetsInput
+                value={localFollowConfig.share_targets || []}
+                onChange={(targets) => handleConfigChange({ share_targets: targets })}
+              />
             </div>
 
             {/* Save & Start Buttons for Warmup */}

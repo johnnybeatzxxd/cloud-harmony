@@ -130,6 +130,7 @@ function StatusBadge({ status }: { status: string }) {
       className = "bg-rose-500/15 text-rose-400 border-rose-500/30";
       dotClass = "bg-rose-400";
       break;
+    case "BANNED":
     case "ERROR":
     case "FAILED":
       className = "bg-red-500/15 text-red-400 border-red-500/30";
